@@ -20,7 +20,9 @@ public final class CompetenceReferentielDTOs {
         private String description;
     }
 
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Data @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Competence {
         private Long id;
         private String nom;
