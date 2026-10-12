@@ -37,4 +37,5 @@ public class MembreCompetence {
 
     @PrePersist
     protected void onCreate() { this.dateAjout = LocalDateTime.now(); }
+
 }
