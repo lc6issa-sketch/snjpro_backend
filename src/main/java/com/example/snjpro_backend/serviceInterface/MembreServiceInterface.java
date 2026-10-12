@@ -27,5 +27,5 @@ public interface MembreServiceInterface {
     String identifiantSuivant(Long cohorteId);
     MembreResponseDTO changerDisponibilite(Long membreId, boolean disponible);
     MembreResponseDTO changerPhoto(Long membreId, org.springframework.web.multipart.MultipartFile photo);
-    com.example.snj_pro_backend.dto.DocumentDTOs.Fichier photo(Long membreId);
+    com.example.snjpro_backend.dto.DocumentDTOs.Fichier photo(Long membreId);
 }

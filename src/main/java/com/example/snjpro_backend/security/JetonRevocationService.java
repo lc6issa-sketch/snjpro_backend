@@ -1,7 +1,7 @@
 package com.example.snjpro_backend.security;
 
-import com.example.snj_pro_backend.entity.JetonRevoque;
-import com.example.snj_pro_backend.repository.JetonRevoqueRepository;
+import com.example.snjpro_backend.entity.JetonRevoque;
+import com.example.snjpro_backend.repository.JetonRevoqueRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

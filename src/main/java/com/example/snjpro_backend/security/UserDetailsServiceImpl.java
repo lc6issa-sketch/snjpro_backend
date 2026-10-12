@@ -1,6 +1,6 @@
 package com.example.snjpro_backend.security;
 
-import com.example.snj_pro_backend.repository.UserRepository;
+import com.example.snjpro_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

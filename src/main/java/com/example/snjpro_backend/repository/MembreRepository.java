@@ -25,7 +25,7 @@ public interface MembreRepository extends JpaRepository<Membre, Long>, JpaSpecif
             "AND ((:dateNaissance IS NULL AND m.dateNaissance IS NULL) OR m.dateNaissance = :dateNaissance)")
     List<Membre> findHomonymes(@Param("nom") String nom, @Param("prenom") String prenom,
                                @Param("dateNaissance") LocalDate dateNaissance);
-    @Query("SELECT m FROM Membre m WHERE m.statut <> com.example.snj_pro_backend.enumeration.StatutMembreEnum.ARCHIVE")
+    @Query("SELECT m FROM Membre m WHERE m.statut <> com.example.snjpro_backend.enumeration.StatutMembreEnum.ARCHIVE")
     List<Membre> findAllNonArchives();
     boolean existsByIdentifiantSnj(String identifiantSnj);
     boolean existsByNumeroTelephone(String numeroTelephone);

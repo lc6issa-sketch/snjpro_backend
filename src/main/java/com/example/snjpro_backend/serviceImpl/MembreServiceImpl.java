@@ -286,11 +286,11 @@ public class MembreServiceImpl implements MembreServiceInterface {
     }
 
     @Override @Transactional(readOnly = true)
-    public com.example.snj_pro_backend.dto.DocumentDTOs.Fichier photo(Long membreId) {
+    public com.example.snjpro_backend.dto.DocumentDTOs.Fichier photo(Long membreId) {
         Membre membre = trouver(membreId);
         if (!StringUtils.hasText(membre.getPhotoUrl()) || membre.getPhotoUrl().startsWith("http"))
             throw new EntityNotFoundException("Aucune photo pour ce membre.");
-        return new com.example.snj_pro_backend.dto.DocumentDTOs.Fichier(stockage.lire(membre.getPhotoUrl()),
+        return new com.example.snjpro_backend.dto.DocumentDTOs.Fichier(stockage.lire(membre.getPhotoUrl()),
                 "photo-" + membre.getIdentifiantSnj(), StockageFichierService.typeMime(membre.getPhotoUrl()));
     }
 

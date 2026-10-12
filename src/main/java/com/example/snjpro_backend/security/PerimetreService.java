@@ -1,10 +1,10 @@
 package com.example.snjpro_backend.security;
 
-import com.example.snj_pro_backend.dto.MembreFilterDTO;
-import com.example.snj_pro_backend.entity.Membre;
-import com.example.snj_pro_backend.entity.User;
-import com.example.snj_pro_backend.enumeration.RoleEnum;
-import com.example.snj_pro_backend.repository.MembreRepository;
+import com.example.snjpro_backend.dto.MembreFilterDTO;
+import com.example.snjpro_backend.entity.Membre;
+import com.example.snjpro_backend.entity.User;
+import com.example.snjpro_backend.enumeration.RoleEnum;
+import com.example.snjpro_backend.repository.MembreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
