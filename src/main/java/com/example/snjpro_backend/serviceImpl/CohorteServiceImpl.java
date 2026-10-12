@@ -135,7 +135,7 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
         historiqueService.enregistrer("CHANGEMENT_STATUT", ENTITE, id, cohorte.getNom() + " : " + ancien + " → " + statut
                 + (dateEffet != null ? " au " + dateEffet : "") + (motif != null ? " · " + motif : ""));
         if (notifierMembres) {
-            java.util.List<com.example.snj_pro_backend.entity.Membre> membres = membreRepository.findAllNonArchives().stream()
+            java.util.List<com.example.snjpro_backend.entity.Membre> membres = membreRepository.findAllNonArchives().stream()
                     .filter(m -> m.getCohorte().getId().equals(id)).toList();
             notificationService.notifierMembres(membres, com.example.snjpro_backend.enumeration.Enumerations.TypeNotification.INFORMATION,
                     cohorte.getNom(), "Le statut de votre cohorte passe à « " + libelle(statut) + " »"
