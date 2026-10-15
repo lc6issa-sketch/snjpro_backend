@@ -81,8 +81,13 @@ public class MessagerieController {
     }
 
     @GetMapping("/contacts")
-    @Operation(summary = "Contacts : services du SNJ et membres de ma cohorte (membre) ou collègues (agent)")
-    public ResponseEntity<List<Contact>> contacts(@RequestParam(required = false) String recherche) {
-        return ResponseEntity.ok(service.contacts(recherche));
+    @Operation(summary = "Contacts : services du SNJ et membres (membre) ou collègues (agent)",
+            description = "Un membre retrouve les autres membres par nom, numéro, matricule ou localisation. "
+                    + "portee = COHORTE (ma cohorte) ou TOUS ; par défaut ma cohorte sans recherche ni filtre, sinon tous les membres.")
+    public ResponseEntity<List<Contact>> contacts(@RequestParam(required = false) String recherche,
+                                                  @RequestParam(required = false) String portee,
+                                                  @RequestParam(required = false) String region,
+                                                  @RequestParam(required = false) Long cohorteId) {
+        return ResponseEntity.ok(service.contacts(recherche, portee, region, cohorteId));
     }
 }
