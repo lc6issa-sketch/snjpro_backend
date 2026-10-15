@@ -50,6 +50,7 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
     private final EnvoiMessageService envoi;
     private final PerimetreService perimetre;
     private final HistoriqueServiceInterface historiqueService;
+    private final UserRepository userRepository;
 
     // =====================================================================
     // Gestion
@@ -70,15 +71,20 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
     @Override @Transactional(readOnly = true)
     public Statistiques statistiques() {
         LocalDateTime debutAnnee = LocalDate.now().withDayOfYear(1).atStartOfDay();
-        List<ParticipationMobilisation> annee = participationRepository.findByDateSollicitationAfter(debutAnnee);
+        User u = perimetre.utilisateurCourant();
+        // Responsables : uniquement les mobilisations de leur périmètre
+        List<Mobilisation> visibles = mobilisationRepository.findAllByOrderByDateCreationDesc().stream().filter(m -> visible(m, u)).toList();
+        Set<Long> ids = visibles.stream().map(Mobilisation::getId).collect(Collectors.toSet());
+        List<ParticipationMobilisation> annee = participationRepository.findByDateSollicitationAfter(debutAnnee).stream()
+                .filter(p -> ids.contains(p.getMobilisation().getId())).toList();
         long repondus = annee.stream().filter(p -> p.getReponse() != ReponseMobilisation.EN_ATTENTE).count();
         long disponibles = annee.stream().filter(p -> p.getReponse() == ReponseMobilisation.DISPONIBLE).count();
         OptionalDouble delai = annee.stream().filter(p -> p.getDateReponse() != null)
                 .mapToLong(p -> Duration.between(p.getDateSollicitation(), p.getDateReponse()).toMinutes()).average();
         return Statistiques.builder()
-                .enCours(mobilisationRepository.countByStatut(StatutMobilisation.EN_COURS))
-                .planifiees(mobilisationRepository.countByStatut(StatutMobilisation.PLANIFIEE))
-                .cloturees(mobilisationRepository.countByStatut(StatutMobilisation.CLOTUREE))
+                .enCours(visibles.stream().filter(m -> m.getStatut() == StatutMobilisation.EN_COURS).count())
+                .planifiees(visibles.stream().filter(m -> m.getStatut() == StatutMobilisation.PLANIFIEE).count())
+                .cloturees(visibles.stream().filter(m -> m.getStatut() == StatutMobilisation.CLOTUREE).count())
                 .membresSollicitesAnnee(annee.size())
                 .tauxReponse(pourcentage(repondus, annee.size()))
                 .delaiMoyenReponseHeures(delai.isPresent() ? Math.round(delai.getAsDouble() / 6.0) / 10.0 : null)
@@ -117,7 +123,7 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
         m.setCritereRegions(joindre(restreindreRegions(c.getRegions())));
         m.setCritereCompetences(joindre(c.getCompetences()));
         m.setCritereToutesCompetences(c.isToutesCompetences());
-        m.setCritereCohortes(joindre(c.getCohorteIds().stream().map(String::valueOf).toList()));
+        m.setCritereCohortes(joindre(restreindreCohortes(c.getCohorteIds()).stream().map(String::valueOf).toList()));
         m.setCritereStatuts(joindre(c.getStatutsMembre().stream().map(Enum::name).toList()));
         m.setCritereSexe(c.getSexe());
         m.setCritereAgeMin(c.getAgeMin());
@@ -336,7 +342,7 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
                 ? participationRepository.membresMobilises(ReponseMobilisation.DISPONIBLE, List.of(StatutMobilisation.EN_COURS, StatutMobilisation.PLANIFIEE))
                 : Set.of();
         List<StatutMembreEnum> statuts = separer(m.getCritereStatuts()).stream().map(StatutMembreEnum::valueOf).toList();
-        return selection.filtrer(SelectionMembres.Criteres.builder()
+        return dansPerimetreDeLAuteur(m, selection.filtrer(SelectionMembres.Criteres.builder()
                 .regions(separer(m.getCritereRegions()))
                 .competences(separer(m.getCritereCompetences()))
                 .toutesCompetences(m.isCritereToutesCompetences())
@@ -346,7 +352,7 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
                 .ageMin(m.getCritereAgeMin()).ageMax(m.getCritereAgeMax())
                 .telephoneVerifieUniquement(m.isCritereTelephoneVerifie())
                 .exclure(exclure)
-                .build());
+                .build()));
     }
 
     private void appliquer(Mobilisation m, Informations dto) {
@@ -373,6 +379,22 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
     private List<String> restreindreRegions(List<String> regions) {
         User u = perimetre.utilisateurCourant();
         return u.getRole() == RoleEnum.ROLE_RESPONSABLE_REGIONAL ? List.of(u.getRegion()) : regions;
+    }
+
+    /** Un responsable de cohorte ne mobilise que les membres de sa cohorte. */
+    private List<Long> restreindreCohortes(List<Long> cohorteIds) {
+        User u = perimetre.utilisateurCourant();
+        return u.getRole() == RoleEnum.ROLE_RESPONSABLE_COHORTE ? List.of(u.getCohorteId()) : cohorteIds;
+    }
+
+    /**
+     * Membres sélectionnés limités au périmètre de l'auteur de la mobilisation (responsable régional ou de cohorte),
+     * même si aucun critère n'a été enregistré.
+     */
+    private List<Membre> dansPerimetreDeLAuteur(Mobilisation m, List<Membre> membres) {
+        User auteur = m.getCreePar() == null ? null : userRepository.findByUsername(m.getCreePar()).orElse(null);
+        if (auteur == null || !perimetre.estResponsable(auteur)) return membres;
+        return membres.stream().filter(x -> perimetre.couvre(auteur, x)).toList();
     }
 
     private boolean visible(Mobilisation m, User u) {
