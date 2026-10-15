@@ -182,6 +182,8 @@ public class DemandeServiceImpl implements DemandeServiceInterface {
         evenement(d, region != null ? "Reçue par la direction régionale de " + region : "Reçue par la direction du SNJ", null);
         notificationService.alerterRoles(List.of(RoleEnum.ROLE_ADMIN_SNJ, RoleEnum.ROLE_RESPONSABLE_REGIONAL), region,
                 "Nouvelle demande", m.getPrenom() + " " + m.getNom() + " · " + d.getObjet(), "DEMANDE", "DEMANDE", d.getId());
+        notificationService.alerterResponsablesCohorte(m.getCohorte().getId(),
+                "Nouvelle demande", m.getPrenom() + " " + m.getNom() + " · " + d.getObjet(), "DEMANDE", "DEMANDE", d.getId());
         historiqueService.enregistrer("CREATION", ENTITE, d.getId(), d.getNumeroSuivi() + " · " + d.getObjet());
         return toDetail(d);
     }
@@ -196,8 +198,12 @@ public class DemandeServiceImpl implements DemandeServiceInterface {
         d.setStatut(StatutDemande.EN_COURS);
         evenement(d, "Complément envoyé par le membre", message);
         if (d.getTraitePar() != null)
+        {
             notificationService.alerterRoles(List.of(RoleEnum.ROLE_ADMIN_SNJ), null, "Complément reçu",
                     d.getNumeroSuivi() + " · " + d.getObjet(), "DEMANDE", "DEMANDE", id);
+            notificationService.alerterResponsablesCohorte(d.getMembre().getCohorte().getId(), "Complément reçu",
+                    d.getNumeroSuivi() + " · " + d.getObjet(), "DEMANDE", "DEMANDE", id);
+        }
         return toDetail(demandeRepository.save(d));
     }
 

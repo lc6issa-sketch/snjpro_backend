@@ -205,8 +205,16 @@ public class NotificationServiceImpl implements NotificationServiceInterface {
                              String lienType, Long lienId) {
         userRepository.findAll().stream()
                 .filter(u -> u.isActif() && roles.contains(u.getRole()))
-                .filter(u -> u.getRole() != RoleEnum.ROLE_RESPONSABLE_REGIONAL || region == null
-                        || region.equalsIgnoreCase(u.getRegion()))
+                // Responsable régional : seulement celui de la région concernée (aucun si la région est inconnue)
+                .filter(u -> u.getRole() != RoleEnum.ROLE_RESPONSABLE_REGIONAL || (region != null && region.equalsIgnoreCase(u.getRegion())))
+                .forEach(u -> alerterUtilisateur(u.getId(), titre, message, type, lienType, lienId));
+    }
+
+    @Override
+    public void alerterResponsablesCohorte(Long cohorteId, String titre, String message, String type, String lienType, Long lienId) {
+        if (cohorteId == null) return;
+        userRepository.findByRole(RoleEnum.ROLE_RESPONSABLE_COHORTE).stream()
+                .filter(u -> u.isActif() && cohorteId.equals(u.getCohorteId()))
                 .forEach(u -> alerterUtilisateur(u.getId(), titre, message, type, lienType, lienId));
     }
 
