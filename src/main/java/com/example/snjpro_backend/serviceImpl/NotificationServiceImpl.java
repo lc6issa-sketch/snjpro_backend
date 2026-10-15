@@ -129,7 +129,8 @@ public class NotificationServiceImpl implements NotificationServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public Estimation estimer(CibleNotification cible, List<String> valeurs, boolean sms) {
-        List<Membre> membres = selection.parCible(cible, restreindreValeurs(cible, valeurs));
+        // Même conversion qu'à l'envoi : pour un responsable, « tous » devient sa région ou sa cohorte
+        List<Membre> membres = selection.parCible(perimetreCible(cible), restreindreValeurs(cible, valeurs));
         int nbSms = sms ? (int) membres.stream().filter(m -> StringUtils.hasText(m.getNumeroTelephone())).count() : 0;
         return Estimation.builder().nombreDestinataires(membres.size()).nombreSms(nbSms).build();
     }
