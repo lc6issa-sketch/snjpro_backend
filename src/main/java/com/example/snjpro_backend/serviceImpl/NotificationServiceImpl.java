@@ -67,7 +67,7 @@ public class NotificationServiceImpl implements NotificationServiceInterface {
 
     @Override
     public Resume modifierBrouillon(Long id, Envoi dto) {
-        Notification n = trouver(id);
+        Notification n = trouverGerable(id);
         if (n.getStatut() == StatutNotification.ENVOYEE)
             throw new ConflitException("Une notification déjà envoyée ne peut plus être modifiée.");
         appliquer(n, dto);
@@ -78,7 +78,7 @@ public class NotificationServiceImpl implements NotificationServiceInterface {
 
     @Override
     public Resume envoyerBrouillon(Long id) {
-        Notification n = trouver(id);
+        Notification n = trouverGerable(id);
         if (n.getStatut() == StatutNotification.ENVOYEE)
             throw new ConflitException("Cette notification a déjà été envoyée.");
         diffuser(n);
@@ -88,7 +88,7 @@ public class NotificationServiceImpl implements NotificationServiceInterface {
 
     @Override
     public void supprimer(Long id) {
-        Notification n = trouver(id);
+        Notification n = trouverGerable(id);
         if (n.getStatut() == StatutNotification.ENVOYEE)
             throw new ConflitException("Une notification envoyée ne peut pas être supprimée (traçabilité).");
         notificationRepository.delete(n);
@@ -97,23 +97,28 @@ public class NotificationServiceImpl implements NotificationServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public Page<Resume> historique(Pageable pageable) {
-        return notificationRepository.findAllByOrderByDateCreationDesc(pageable).map(this::toResume);
+        User u = perimetre.utilisateurCourant();
+        // Un responsable ne voit que ses propres envois
+        return (perimetre.estResponsable(u)
+                ? notificationRepository.findByEmetteurOrderByDateCreationDesc(u.getUsername(), pageable)
+                : notificationRepository.findAllByOrderByDateCreationDesc(pageable)).map(this::toResume);
     }
 
     @Override @Transactional(readOnly = true)
-    public Resume obtenir(Long id) { return toResume(trouver(id)); }
+    public Resume obtenir(Long id) { return toResume(trouverGerable(id)); }
 
     @Override @Transactional(readOnly = true)
     public Statistiques statistiques() {
         LocalDateTime debutMois = LocalDateTime.now().withDayOfMonth(1).toLocalDate().atStartOfDay();
-        List<Notification> duMois = notificationRepository.findByDateEnvoiAfter(debutMois);
+        User u = perimetre.utilisateurCourant();
+        List<Notification> duMois = notificationRepository.findByDateEnvoiAfter(debutMois).stream().filter(n -> gerable(n, u)).toList();
         long destinataires = 0, lus = 0, sms = 0;
         for (Notification n : duMois) {
             destinataires += destinataireRepository.countByNotificationId(n.getId());
             lus += destinataireRepository.countByNotificationIdAndLuTrue(n.getId());
             sms += n.getNombreSms() == null ? 0 : n.getNombreSms();
         }
-        long programmees = notificationRepository.findAll().stream().filter(n -> n.getStatut() == StatutNotification.PROGRAMMEE).count();
+        long programmees = notificationRepository.findAll().stream().filter(n -> n.getStatut() == StatutNotification.PROGRAMMEE && gerable(n, u)).count();
         return Statistiques.builder()
                 .envoyeesCeMois(duMois.size())
                 .tauxLectureMoyen(destinataires == 0 ? 0 : (int) Math.round(lus * 100.0 / destinataires))
@@ -275,7 +280,24 @@ public class NotificationServiceImpl implements NotificationServiceInterface {
             if (u.getRole() == RoleEnum.ROLE_RESPONSABLE_REGIONAL) return List.of(u.getRegion());
             if (u.getRole() == RoleEnum.ROLE_RESPONSABLE_COHORTE) return List.of(String.valueOf(u.getCohorteId()));
         }
-        return valeurs == null ? List.of() : valeurs.stream().filter(StringUtils::hasText).map(String::trim).toList();
+        List<String> v = valeurs == null ? List.of() : valeurs.stream().filter(StringUtils::hasText).map(String::trim).toList();
+        // Sélection libre d'un responsable : seuls les membres de son périmètre sont conservés
+        if (cible == CibleNotification.SELECTION && perimetre.estResponsable(u))
+            return selection.parCible(CibleNotification.SELECTION, v).stream()
+                    .filter(m -> perimetre.couvre(u, m)).map(m -> String.valueOf(m.getId())).toList();
+        return v;
+    }
+
+    /** Les administrateurs gèrent toutes les notifications ; un responsable uniquement les siennes. */
+    private boolean gerable(Notification n, User u) {
+        return !perimetre.estResponsable(u) || u.getUsername().equals(n.getEmetteur());
+    }
+
+    private Notification trouverGerable(Long id) {
+        Notification n = trouver(id);
+        if (!gerable(n, perimetre.utilisateurCourant()))
+            throw new org.springframework.security.access.AccessDeniedException("Cette notification ne fait pas partie de votre périmètre.");
+        return n;
     }
 
     private void diffuser(Notification n) {
