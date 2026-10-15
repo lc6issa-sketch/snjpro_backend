@@ -61,7 +61,10 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
 
     @Override
     public TableauDeBord tableauDeBord() {
+        User u = perimetre.utilisateurCourant();
+        boolean responsable = perimetre.estResponsable(u);
         List<Membre> membres = membresDuPerimetre();
+        Set<Long> idsMembres = membres.stream().map(Membre::getId).collect(Collectors.toSet());
         LocalDateTime debutMois = LocalDate.now().withDayOfMonth(1).atStartOfDay();
         long nouveauxCeMois = membres.stream().filter(m -> m.getDateCreation() != null && m.getDateCreation().isAfter(debutMois)).count();
         long avantMois = membres.size() - nouveauxCeMois;
@@ -71,9 +74,16 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
         long dispoSemaine = participationRepository.findByDateSollicitationAfter(LocalDateTime.now().minusDays(30)).stream()
                 .filter(p -> p.getReponse() == ReponseMobilisation.DISPONIBLE && p.getDateReponse() != null
                         && p.getDateReponse().isAfter(LocalDateTime.now().minusDays(7)))
-                .map(p -> p.getMembre().getId()).distinct().count();
-        List<Cohorte> cohortes = cohorteRepository.findAll();
-        List<Competence> competences = competenceService.lister(null, null, "MEMBRES");
+                .map(p -> p.getMembre().getId()).filter(idsMembres::contains).distinct().count();
+        // Responsables : cohortes où se trouvent leurs membres (le responsable de cohorte voit toujours la sienne)
+        Set<Long> idsCohortes = membres.stream().map(m -> m.getCohorte().getId()).collect(Collectors.toSet());
+        if (u.getCohorteId() != null && u.getRole() == RoleEnum.ROLE_RESPONSABLE_COHORTE) idsCohortes.add(u.getCohorteId());
+        List<Cohorte> cohortes = cohorteRepository.findAll().stream().filter(c -> !responsable || idsCohortes.contains(c.getId())).toList();
+        // Compétences les plus présentes parmi les membres du périmètre
+        List<Libelle> parCompetence = membres.stream().flatMap(m -> m.getCompetences().stream().map(c -> c.getIntitule().trim()).distinct())
+                .collect(Collectors.groupingBy(c -> c, Collectors.counting())).entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .map(e -> new Libelle(e.getKey(), e.getValue(), pourcentage(e.getValue(), membres.size()))).toList();
         int anneeCourante = LocalDate.now().getYear();
         Map<Integer, Long> evolution = new TreeMap<>();
         for (int a = anneeCourante - 10; a <= anneeCourante; a++) evolution.put(a, 0L);
@@ -94,11 +104,12 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
                 .evolutionEffectifs(evolution)
                 .repartitionSexe(repartition(membres, m -> m.getSexe() == SexeEnum.FEMININ ? "Femmes" : "Hommes"))
                 .repartitionRegions(repartition(membres, StatistiqueServiceImpl::region))
-                .topCompetences(competences.stream().limit(6)
-                        .map(c -> new Libelle(c.getNom(), c.getNombreMembres(), pourcentage(c.getNombreMembres(), membres.size()))).toList())
-                .nombreCompetences(competences.size())
-                .activiteRecente(historiqueRepository.findAll(PageRequest.of(0, 6, Sort.by(Sort.Direction.DESC, "dateAction"))).stream()
+                .topCompetences(parCompetence.stream().limit(6).toList())
+                .nombreCompetences(parCompetence.size())
+                // Responsables : uniquement leurs propres actions
+                .activiteRecente(historiqueRepository.findAll(PageRequest.of(0, responsable ? 200 : 6, Sort.by(Sort.Direction.DESC, "dateAction"))).stream()
                         .filter(h -> !h.getAction().startsWith("CONNEXION") && !h.getAction().equals("DECONNEXION"))
+                        .filter(h -> !responsable || u.getUsername().equals(h.getUtilisateur()))
                         .limit(5)
                         .map(h -> ActiviteRecente.builder().titre(h.getDetails() != null ? h.getDetails() : h.getEntite())
                                 .description(libelleAction(h.getAction()) + " · " + h.getEntite().toLowerCase())
