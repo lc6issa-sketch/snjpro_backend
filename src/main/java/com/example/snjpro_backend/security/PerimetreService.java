@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  *     <li>Responsable de cohorte : membres de sa cohorte ;</li>
  *     <li>Membre : uniquement sa propre fiche.</li>
  * </ul>
+ * Les actions d'un responsable (mobilisations, actualités, notifications, activités) ne touchent que son périmètre.
  * Exposé sous le nom {@code perimetre} pour être utilisé dans les expressions {@code @PreAuthorize}.
  */
 @Service("perimetre")
@@ -72,6 +73,37 @@ public class PerimetreService {
             case ROLE_MEMBRE -> user.getId().equals(membre.getUserId());
             default -> false;
         };
+    }
+
+    /** Responsable régional ou de cohorte : son action est limitée à son périmètre. */
+    public boolean estResponsable(User user) {
+        return user.getRole() == RoleEnum.ROLE_RESPONSABLE_REGIONAL || user.getRole() == RoleEnum.ROLE_RESPONSABLE_COHORTE;
+    }
+
+    /** Le membre fait-il partie du périmètre de l'utilisateur (sans requête : fiche déjà chargée) ? */
+    public boolean couvre(User user, Membre membre) {
+        return switch (user.getRole()) {
+            case ROLE_ADMIN_SYSTEME, ROLE_ADMIN_SNJ, ROLE_DIRECTION -> true;
+            case ROLE_RESPONSABLE_REGIONAL -> user.getRegion() != null && membre.getLocalisation() != null
+                    && user.getRegion().equalsIgnoreCase(membre.getLocalisation().getRegion());
+            case ROLE_RESPONSABLE_COHORTE -> user.getCohorteId() != null && membre.getCohorte() != null
+                    && user.getCohorteId().equals(membre.getCohorte().getId());
+            case ROLE_MEMBRE -> user.getId().equals(membre.getUserId());
+            default -> false;
+        };
+    }
+
+    public boolean couvre(Membre membre) { return couvre(utilisateurCourant(), membre); }
+
+    /** Le responsable de cohorte ne voit que sa cohorte ; les autres rôles de gestion voient toutes les cohortes. */
+    public boolean voitCohorte(User user, Long cohorteId) {
+        return user.getRole() != RoleEnum.ROLE_RESPONSABLE_COHORTE || (cohorteId != null && cohorteId.equals(user.getCohorteId()));
+    }
+
+    /** Lève une erreur 403 si la cohorte est hors du périmètre de l'utilisateur courant. */
+    public void exigerCohorte(Long cohorteId) {
+        if (!voitCohorte(utilisateurCourant(), cohorteId))
+            throw new AccessDeniedException("Cette cohorte ne fait pas partie de votre périmètre.");
     }
 
     /** Vérifie l'accès à une fiche identifiée par son identifiant SNJ. */
