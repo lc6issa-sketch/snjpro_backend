@@ -71,6 +71,8 @@ public class SecurityConfig {
                         "/api/auth/mot-de-passe-oublie", "/api/auth/mot-de-passe-oublie/**", "/api/auth/reinitialiser",
                         "/api/auth/activation/**", "/api/auth/invitation/accepter").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/invitation").permitAll()
+                // Logo et charte graphique : nécessaires avant la connexion
+                .requestMatchers(HttpMethod.GET, "/api/apparence").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/api/utilisateurs/**", "/api/historique/**", "/api/import/**")
                     .hasAnyRole("ADMIN_SYSTEME", "ADMIN_SNJ")
