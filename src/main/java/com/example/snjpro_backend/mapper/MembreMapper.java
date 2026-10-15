@@ -25,6 +25,7 @@ public class MembreMapper {
         dto.setTelephoneSecondaire(m.getTelephoneSecondaire());
         dto.setTelephoneVerifie(Boolean.TRUE.equals(m.getTelephoneVerifie()));
         dto.setPersonneAPrevenir(m.getPersonneAPrevenir());
+        dto.setPersonneAPrevenirTelephone(m.getPersonneAPrevenirTelephone());
         dto.setNationalite(m.getNationalite());
         dto.setGroupeSanguin(m.getGroupeSanguin());
         dto.setTaille(m.getTaille());

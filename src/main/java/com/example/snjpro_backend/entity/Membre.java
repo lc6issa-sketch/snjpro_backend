@@ -55,8 +55,12 @@ public class Membre {
     @Column(name = "telephone_verifie")
     private Boolean telephoneVerifie;
 
+    /** Nom de la personne à prévenir. */
     @Column(name = "personne_a_prevenir", length = 150)
     private String personneAPrevenir;
+
+    @Column(name = "personne_a_prevenir_telephone", length = 20)
+    private String personneAPrevenirTelephone;
 
     @Column(length = 50)
     private String nationalite;

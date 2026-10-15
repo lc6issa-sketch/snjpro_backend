@@ -33,6 +33,8 @@ public class SuiviModifications {
         LIBELLES.put("numeroTelephone", "Téléphone");
         LIBELLES.put("telephoneVerifie", "Téléphone vérifié");
         LIBELLES.put("email", "E-mail");
+        LIBELLES.put("personneAPrevenir", "Personne à prévenir");
+        LIBELLES.put("personneAPrevenirTelephone", "Téléphone de la personne à prévenir");
         LIBELLES.put("statut", "Statut");
         LIBELLES.put("cohorte", "Cohorte");
         LIBELLES.put("nationalite", "Nationalité");
@@ -61,6 +63,8 @@ public class SuiviModifications {
         v.put("numeroTelephone", m.getNumeroTelephone());
         v.put("telephoneVerifie", Boolean.TRUE.equals(m.getTelephoneVerifie()) ? "Oui" : "Non");
         v.put("email", m.getEmail());
+        v.put("personneAPrevenir", m.getPersonneAPrevenir());
+        v.put("personneAPrevenirTelephone", m.getPersonneAPrevenirTelephone());
         v.put("statut", texte(m.getStatut()));
         v.put("cohorte", m.getCohorte() != null ? m.getCohorte().getNom() : null);
         v.put("nationalite", m.getNationalite());
@@ -110,6 +114,8 @@ public class SuiviModifications {
             case "lieuNaissance" -> m.setLieuNaissance(v);
             case "numeroTelephone" -> m.setNumeroTelephone(v);
             case "email" -> m.setEmail(v);
+            case "personneAPrevenir" -> m.setPersonneAPrevenir(v);
+            case "personneAPrevenirTelephone" -> m.setPersonneAPrevenirTelephone(v);
             case "statut" -> { if (v != null) m.setStatut(StatutMembreEnum.valueOf(v)); }
             case "nationalite" -> m.setNationalite(v);
             case "groupeSanguin" -> m.setGroupeSanguin(v);

@@ -21,6 +21,7 @@ public class MembreResponseDTO {
     private String telephoneSecondaire;
     private Boolean telephoneVerifie;
     private String personneAPrevenir;
+    private String personneAPrevenirTelephone;
     private String nationalite;
     private String groupeSanguin;
     private Double taille;

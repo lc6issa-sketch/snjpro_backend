@@ -298,6 +298,8 @@ public class MembreServiceImpl implements MembreServiceInterface {
     private void appliquerComplements(Membre m, MembreDTO dto) {
         if (dto.getTelephoneSecondaire() != null) m.setTelephoneSecondaire(DoublonDetecteur.normaliserTelephone(dto.getTelephoneSecondaire()));
         if (dto.getPersonneAPrevenir() != null) m.setPersonneAPrevenir(dto.getPersonneAPrevenir());
+        if (dto.getPersonneAPrevenirTelephone() != null)
+            m.setPersonneAPrevenirTelephone(DoublonDetecteur.normaliserTelephone(dto.getPersonneAPrevenirTelephone()));
         if (dto.getNationalite() != null) m.setNationalite(dto.getNationalite());
         if (dto.getGroupeSanguin() != null) m.setGroupeSanguin(dto.getGroupeSanguin());
         if (dto.getTaille() != null) m.setTaille(dto.getTaille());
