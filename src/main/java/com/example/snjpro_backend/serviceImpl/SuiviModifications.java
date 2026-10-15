@@ -43,6 +43,7 @@ public class SuiviModifications {
         LIBELLES.put("categorie", "Catégorie");
         LIBELLES.put("compagnie", "Compagnie");
         LIBELLES.put("section", "Section");
+        LIBELLES.put("brigade", "Brigade");
         LIBELLES.put("statutProfessionnel", "Situation professionnelle");
         LIBELLES.put("profession", "Profession");
         LIBELLES.put("employeur", "Employeur");
@@ -73,6 +74,7 @@ public class SuiviModifications {
         v.put("categorie", m.getCategorie());
         v.put("compagnie", m.getCompagnie());
         v.put("section", m.getSection());
+        v.put("brigade", m.getBrigade());
         SituationProfessionnelle sp = m.getSituationProfessionnelle();
         v.put("statutProfessionnel", sp == null ? null : texte(sp.getStatut()));
         v.put("profession", sp == null ? null : sp.getProfession());
@@ -129,6 +131,7 @@ public class SuiviModifications {
             case "categorie" -> m.setCategorie(v);
             case "compagnie" -> m.setCompagnie(v);
             case "section" -> m.setSection(v);
+            case "brigade" -> m.setBrigade(v);
             case "statutProfessionnel", "profession", "employeur", "secteurActivite" -> {
                 SituationProfessionnelle sp = m.getSituationProfessionnelle();
                 if (sp == null) {

@@ -56,6 +56,8 @@ public class MembreDTO {
     private String compagnie;
     @Size(max = 50)
     private String section;
+    @Size(max = 50)
+    private String brigade;
     private java.time.LocalDate dateIncorporation;
     private Boolean disponibleMobilisation;
     private StatutMembreEnum statut;

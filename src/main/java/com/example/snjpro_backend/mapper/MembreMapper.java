@@ -35,6 +35,7 @@ public class MembreMapper {
         dto.setCategorie(m.getCategorie());
         dto.setCompagnie(m.getCompagnie());
         dto.setSection(m.getSection());
+        dto.setBrigade(m.getBrigade());
         dto.setDateIncorporation(m.getDateIncorporation());
         dto.setDisponibleMobilisation(!Boolean.FALSE.equals(m.getDisponibleMobilisation()));
         dto.setTauxCompletude(com.example.snjpro_backend.serviceImpl.CompletudeProfil.taux(m));

@@ -313,6 +313,7 @@ public class MembreServiceImpl implements MembreServiceInterface {
         if (dto.getCategorie() != null) m.setCategorie(dto.getCategorie());
         if (dto.getCompagnie() != null) m.setCompagnie(dto.getCompagnie());
         if (dto.getSection() != null) m.setSection(dto.getSection());
+        if (dto.getBrigade() != null) m.setBrigade(dto.getBrigade());
         if (dto.getDateIncorporation() != null) m.setDateIncorporation(dto.getDateIncorporation());
         if (dto.getDisponibleMobilisation() != null) m.setDisponibleMobilisation(dto.getDisponibleMobilisation());
     }

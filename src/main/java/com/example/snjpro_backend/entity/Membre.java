@@ -96,6 +96,9 @@ public class Membre {
     @Column(length = 50)
     private String section;
 
+    @Column(length = 50)
+    private String brigade;
+
     @Column(name = "date_incorporation")
     private LocalDate dateIncorporation;
 

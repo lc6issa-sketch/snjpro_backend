@@ -31,6 +31,7 @@ public class MembreResponseDTO {
     private String categorie;
     private String compagnie;
     private String section;
+    private String brigade;
     private LocalDate dateIncorporation;
     private Boolean disponibleMobilisation;
     private StatutMembreEnum statut;
