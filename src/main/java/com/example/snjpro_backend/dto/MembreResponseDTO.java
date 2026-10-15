@@ -26,6 +26,7 @@ public class MembreResponseDTO {
     private Double taille;
     private Double poids;
     private String dernierDiplome;
+    private java.util.List<String> diplomes;
     private String categorie;
     private String compagnie;
     private String section;

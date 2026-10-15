@@ -70,8 +70,17 @@ public class Membre {
     /** Poids en kilogrammes. */
     private Double poids;
 
+    /** Diplôme le plus élevé, déduit de la liste des diplômes. */
     @Column(name = "dernier_diplome", length = 50)
     private String dernierDiplome;
+
+    /** Diplômes obtenus, dans l'ordre de saisie. */
+    @ElementCollection
+    @CollectionTable(name = "membre_diplomes", joinColumns = @JoinColumn(name = "membre_id"))
+    @OrderColumn(name = "ordre")
+    @Column(name = "diplome", length = 50)
+    @Builder.Default
+    private List<String> diplomes = new ArrayList<>();
 
     /** FONCTIONNAIRE ou NON_FONCTIONNAIRE. */
     @Column(length = 30)

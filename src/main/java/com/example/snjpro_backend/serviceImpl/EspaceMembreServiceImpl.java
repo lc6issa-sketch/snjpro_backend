@@ -174,7 +174,7 @@ public class EspaceMembreServiceImpl implements EspaceMembreServiceInterface {
         if (m.getLocalisation() != null)
             identite.add(new String[]{"Adresse", joindre(m.getLocalisation().getQuartier(), m.getLocalisation().getCommune(),
                     m.getLocalisation().getCercle(), m.getLocalisation().getRegion())});
-        if (m.getDernierDiplome() != null) identite.add(new String[]{"Dernier diplôme", m.getDernierDiplome()});
+        if (m.getDiplomes() != null && !m.getDiplomes().isEmpty()) identite.add(new String[]{"Diplômes", String.join(", ", m.getDiplomes())});
         sections.add(new GenerateurFichiers.Section("Informations personnelles", identite));
 
         SituationProfessionnelleDTO sp = m.getSituationProfessionnelle();

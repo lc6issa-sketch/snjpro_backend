@@ -39,8 +39,7 @@ public class ReferentielController {
     /** Centres d'instruction du SNJ (complétés par ceux saisis sur les cohortes). */
     private static final List<String> CENTRES = List.of("Centre d'instruction de Ségou", "Centre d'instruction de Kati",
             "Centre d'instruction de Koulikoro", "Centre d'instruction de Sikasso", "Centre d'instruction de Kayes");
-    private static final List<String> DIPLOMES = List.of("Aucun", "CEP", "DEF", "CAP", "BT", "BAC", "DUT / BTS",
-            "Licence", "Master", "Doctorat", "Autre");
+    private static final List<String> DIPLOMES = com.example.snjpro_backend.serviceImpl.Diplomes.REFERENTIEL;
     private static final List<String> GROUPES_SANGUINS = List.of("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-");
     private static final List<String> CATEGORIES = List.of("FONCTIONNAIRE", "NON_FONCTIONNAIRE");
 

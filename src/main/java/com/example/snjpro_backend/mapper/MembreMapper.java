@@ -30,6 +30,7 @@ public class MembreMapper {
         dto.setTaille(m.getTaille());
         dto.setPoids(m.getPoids());
         dto.setDernierDiplome(m.getDernierDiplome());
+        dto.setDiplomes(diplomes(m));
         dto.setCategorie(m.getCategorie());
         dto.setCompagnie(m.getCompagnie());
         dto.setSection(m.getSection());
@@ -49,6 +50,14 @@ public class MembreMapper {
             dto.setLocalisation(toLocalisationDTO(m.getLocalisation()));
         }
         return dto;
+    }
+
+    /** Diplômes du membre ; un dernier diplôme saisi ailleurs (ancienne fiche, demande) y est ajouté s'il manque. */
+    private static java.util.List<String> diplomes(Membre m) {
+        java.util.List<String> l = new java.util.ArrayList<>(m.getDiplomes() == null ? java.util.List.of() : m.getDiplomes());
+        String dernier = m.getDernierDiplome();
+        if (dernier != null && l.stream().noneMatch(d -> d.equalsIgnoreCase(dernier))) l.add(dernier);
+        return l;
     }
 
     public SituationProfessionnelleDTO toSituationDTO(SituationProfessionnelle sp) {

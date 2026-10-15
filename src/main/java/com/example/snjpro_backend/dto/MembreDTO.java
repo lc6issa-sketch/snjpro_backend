@@ -45,6 +45,8 @@ public class MembreDTO {
     private Double poids;
     @Size(max = 50)
     private String dernierDiplome;
+    /** Diplômes obtenus ; le plus élevé devient le dernier diplôme. */
+    private java.util.List<@Size(max = 50) String> diplomes;
     @Pattern(regexp = "^(FONCTIONNAIRE|NON_FONCTIONNAIRE)$", message = "Catégorie attendue : FONCTIONNAIRE ou NON_FONCTIONNAIRE")
     private String categorie;
     @Size(max = 50)

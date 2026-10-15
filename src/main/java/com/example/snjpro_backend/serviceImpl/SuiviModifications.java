@@ -19,6 +19,9 @@ import java.util.*;
 @Component
 public class SuiviModifications {
 
+    /** Séparateur des diplômes dans l'instantané texte. */
+    private static final String SEPARATEUR_DIPLOMES = ", ";
+
     /** Libellés affichés dans l'historique, dans l'ordre. */
     public static final Map<String, String> LIBELLES = new LinkedHashMap<>();
     static {
@@ -34,7 +37,7 @@ public class SuiviModifications {
         LIBELLES.put("cohorte", "Cohorte");
         LIBELLES.put("nationalite", "Nationalité");
         LIBELLES.put("groupeSanguin", "Groupe sanguin");
-        LIBELLES.put("dernierDiplome", "Dernier diplôme");
+        LIBELLES.put("diplomes", "Diplômes");
         LIBELLES.put("categorie", "Catégorie");
         LIBELLES.put("compagnie", "Compagnie");
         LIBELLES.put("section", "Section");
@@ -62,7 +65,7 @@ public class SuiviModifications {
         v.put("cohorte", m.getCohorte() != null ? m.getCohorte().getNom() : null);
         v.put("nationalite", m.getNationalite());
         v.put("groupeSanguin", m.getGroupeSanguin());
-        v.put("dernierDiplome", m.getDernierDiplome());
+        v.put("diplomes", m.getDiplomes() == null || m.getDiplomes().isEmpty() ? m.getDernierDiplome() : String.join(SEPARATEUR_DIPLOMES, m.getDiplomes()));
         v.put("categorie", m.getCategorie());
         v.put("compagnie", m.getCompagnie());
         v.put("section", m.getSection());
@@ -111,6 +114,12 @@ public class SuiviModifications {
             case "nationalite" -> m.setNationalite(v);
             case "groupeSanguin" -> m.setGroupeSanguin(v);
             case "dernierDiplome" -> m.setDernierDiplome(v);
+            case "diplomes" -> {
+                List<String> l = Diplomes.nettoyer(v == null ? List.of() : Arrays.asList(v.split(SEPARATEUR_DIPLOMES)));
+                m.getDiplomes().clear();
+                m.getDiplomes().addAll(l);
+                m.setDernierDiplome(Diplomes.plusEleve(l));
+            }
             case "categorie" -> m.setCategorie(v);
             case "compagnie" -> m.setCompagnie(v);
             case "section" -> m.setSection(v);

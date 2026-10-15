@@ -302,7 +302,12 @@ public class MembreServiceImpl implements MembreServiceInterface {
         if (dto.getGroupeSanguin() != null) m.setGroupeSanguin(dto.getGroupeSanguin());
         if (dto.getTaille() != null) m.setTaille(dto.getTaille());
         if (dto.getPoids() != null) m.setPoids(dto.getPoids());
-        if (dto.getDernierDiplome() != null) m.setDernierDiplome(dto.getDernierDiplome());
+        if (dto.getDiplomes() != null) {
+            List<String> diplomes = Diplomes.nettoyer(dto.getDiplomes());
+            m.getDiplomes().clear();
+            m.getDiplomes().addAll(diplomes);
+            m.setDernierDiplome(Diplomes.plusEleve(diplomes));
+        } else if (dto.getDernierDiplome() != null) m.setDernierDiplome(dto.getDernierDiplome());
         if (dto.getCategorie() != null) m.setCategorie(dto.getCategorie());
         if (dto.getCompagnie() != null) m.setCompagnie(dto.getCompagnie());
         if (dto.getSection() != null) m.setSection(dto.getSection());
