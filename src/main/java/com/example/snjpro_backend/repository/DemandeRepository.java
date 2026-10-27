@@ -16,6 +16,6 @@ public interface DemandeRepository extends JpaRepository<Demande, Long> {
     Optional<Demande> findByIdAndMembreId(Long id, Long membreId);
     long countByStatut(StatutDemande statut);
 
-    @Query("SELECT MAX(d.numeroSuivi) FROM Demande d WHERE d.numeroSuivi LIKE CONCAT(:prefixe, '%')")
-    String dernierNumero(String prefixe);
+    @Query("SELECT d.numeroSuivi FROM Demande d WHERE d.numeroSuivi LIKE CONCAT(:prefixe, '%')")
+    List<String> numerosAvecPrefixe(String prefixe);
 }

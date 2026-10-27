@@ -20,7 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/import/sessions")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN_SYSTEME', 'ADMIN_SNJ')")
+@PreAuthorize("hasAnyRole('ADMIN_SYSTEME', 'ADMIN_SNJ', 'RESPONSABLE_COHORTE')") // responsable : sa cohorte uniquement (contrôlé dans le service)
 @Tag(name = "07. Recherche, import & doublons")
 @SecurityRequirement(name = "bearerAuth")
 public class ImportAssistantController {

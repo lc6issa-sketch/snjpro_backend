@@ -17,5 +17,5 @@ public interface MessagerieServiceInterface {
     MessageDTO envoyer(Long conversationId, NouveauMessage dto);
     MessageDTO envoyerPieceJointe(Long conversationId, MultipartFile fichier, String contenu);
     Fichier pieceJointe(Long messageId);
-    List<Contact> contacts(String recherche);
+    List<Contact> contacts(String recherche, String portee, String region, Long cohorteId);
 }

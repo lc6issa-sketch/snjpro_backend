@@ -24,7 +24,8 @@ import java.util.List;
 @Tag(name = "13. Actualités", description = "Publication des informations et annonces du SNJ (F23)")
 @SecurityRequirement(name = "bearerAuth")
 public class ActualiteController {
-    private static final String REDACTEURS = "hasAnyRole('ADMIN_SYSTEME', 'ADMIN_SNJ', 'DIRECTION')";
+    // Responsables : actualités limitées à leur région ou à leur cohorte (contrôlé dans le service)
+    private static final String REDACTEURS = "hasAnyRole('ADMIN_SYSTEME', 'ADMIN_SNJ', 'DIRECTION', 'RESPONSABLE_REGIONAL', 'RESPONSABLE_COHORTE')";
 
     private final ActualiteServiceInterface service;
 

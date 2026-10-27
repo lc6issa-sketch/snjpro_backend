@@ -21,14 +21,17 @@ public class MembreResponseDTO {
     private String telephoneSecondaire;
     private Boolean telephoneVerifie;
     private String personneAPrevenir;
+    private String personneAPrevenirTelephone;
     private String nationalite;
     private String groupeSanguin;
     private Double taille;
     private Double poids;
     private String dernierDiplome;
+    private java.util.List<String> diplomes;
     private String categorie;
     private String compagnie;
     private String section;
+    private String brigade;
     private LocalDate dateIncorporation;
     private Boolean disponibleMobilisation;
     private StatutMembreEnum statut;

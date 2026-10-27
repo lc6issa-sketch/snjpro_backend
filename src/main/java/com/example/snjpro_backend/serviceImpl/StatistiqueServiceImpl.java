@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +50,7 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
     private final ParticipationMobilisationRepository participationRepository;
     private final HistoriqueRepository historiqueRepository;
     private final RapportRepository rapportRepository;
+    private final MembreCompetenceRepository membreCompetenceRepository;
     private final CompetenceReferentielServiceInterface competenceService;
     private final GenerateurFichiers generateur;
     private final StockageFichierService stockage;
@@ -61,7 +63,10 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
 
     @Override
     public TableauDeBord tableauDeBord() {
+        User u = perimetre.utilisateurCourant();
+        boolean responsable = perimetre.estResponsable(u);
         List<Membre> membres = membresDuPerimetre();
+        Set<Long> idsMembres = membres.stream().map(Membre::getId).collect(Collectors.toSet());
         LocalDateTime debutMois = LocalDate.now().withDayOfMonth(1).atStartOfDay();
         long nouveauxCeMois = membres.stream().filter(m -> m.getDateCreation() != null && m.getDateCreation().isAfter(debutMois)).count();
         long avantMois = membres.size() - nouveauxCeMois;
@@ -71,9 +76,16 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
         long dispoSemaine = participationRepository.findByDateSollicitationAfter(LocalDateTime.now().minusDays(30)).stream()
                 .filter(p -> p.getReponse() == ReponseMobilisation.DISPONIBLE && p.getDateReponse() != null
                         && p.getDateReponse().isAfter(LocalDateTime.now().minusDays(7)))
-                .map(p -> p.getMembre().getId()).distinct().count();
-        List<Cohorte> cohortes = cohorteRepository.findAll();
-        List<Competence> competences = competenceService.lister(null, null, "MEMBRES");
+                .map(p -> p.getMembre().getId()).filter(idsMembres::contains).distinct().count();
+        // Responsables : cohortes où se trouvent leurs membres (le responsable de cohorte voit toujours la sienne)
+        Set<Long> idsCohortes = membres.stream().map(m -> m.getCohorte().getId()).collect(Collectors.toSet());
+        if (u.getCohorteId() != null && u.getRole() == RoleEnum.ROLE_RESPONSABLE_COHORTE) idsCohortes.add(u.getCohorteId());
+        List<Cohorte> cohortes = cohorteRepository.findAll().stream().filter(c -> !responsable || idsCohortes.contains(c.getId())).toList();
+        // Compétences les plus présentes parmi les membres du périmètre
+        List<Libelle> parCompetence = membres.stream().flatMap(m -> m.getCompetences().stream().map(c -> c.getIntitule().trim()).distinct())
+                .collect(Collectors.groupingBy(c -> c, Collectors.counting())).entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .map(e -> new Libelle(e.getKey(), e.getValue(), pourcentage(e.getValue(), membres.size()))).toList();
         int anneeCourante = LocalDate.now().getYear();
         Map<Integer, Long> evolution = new TreeMap<>();
         for (int a = anneeCourante - 10; a <= anneeCourante; a++) evolution.put(a, 0L);
@@ -94,11 +106,12 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
                 .evolutionEffectifs(evolution)
                 .repartitionSexe(repartition(membres, m -> m.getSexe() == SexeEnum.FEMININ ? "Femmes" : "Hommes"))
                 .repartitionRegions(repartition(membres, StatistiqueServiceImpl::region))
-                .topCompetences(competences.stream().limit(6)
-                        .map(c -> new Libelle(c.getNom(), c.getNombreMembres(), pourcentage(c.getNombreMembres(), membres.size()))).toList())
-                .nombreCompetences(competences.size())
-                .activiteRecente(historiqueRepository.findAll(PageRequest.of(0, 6, Sort.by(Sort.Direction.DESC, "dateAction"))).stream()
+                .topCompetences(parCompetence.stream().limit(6).toList())
+                .nombreCompetences(parCompetence.size())
+                // Responsables : uniquement leurs propres actions
+                .activiteRecente(historiqueRepository.findAll(PageRequest.of(0, responsable ? 200 : 6, Sort.by(Sort.Direction.DESC, "dateAction"))).stream()
                         .filter(h -> !h.getAction().startsWith("CONNEXION") && !h.getAction().equals("DECONNEXION"))
+                        .filter(h -> !responsable || u.getUsername().equals(h.getUtilisateur()))
                         .limit(5)
                         .map(h -> ActiviteRecente.builder().titre(h.getDetails() != null ? h.getDetails() : h.getEntite())
                                 .description(libelleAction(h.getAction()) + " · " + h.getEntite().toLowerCase())
@@ -120,6 +133,9 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
                 .collect(Collectors.groupingBy(StatistiqueServiceImpl::anneeIncorporation, TreeMap::new, Collectors.toList()));
         Map<Integer, Integer> completude = new TreeMap<>();
         parAnnee.forEach((a, l) -> completude.put(a, (int) Math.round(l.stream().mapToInt(CompletudeProfil::taux).average().orElse(0))));
+        Set<Long> avecCompetences = membreCompetenceRepository.findMembresAvecCompetences();
+        Map<Integer, Integer> competences = new TreeMap<>();
+        parAnnee.forEach((a, l) -> competences.put(a, pourcentage(l.stream().filter(m -> avecCompetences.contains(m.getId())).count(), l.size())));
         return Statistiques.builder()
                 .totalMembres(membres.size())
                 .repartitionGeographique(repartition(membres, StatistiqueServiceImpl::region))
@@ -127,12 +143,13 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
                 .situationProfessionnelle(repartition(avecSituation, m -> libelleStatut(m.getSituationProfessionnelle().getStatut())))
                 .profilsAvecSituation(avecSituation.size())
                 .completudeParAnnee(completude)
+                .competencesParAnnee(competences)
                 .repartitionSexe(repartition(membres, m -> m.getSexe() == SexeEnum.FEMININ ? "Femmes" : "Hommes"))
                 .parCohorte(repartition(membres, m -> m.getCohorte().getNom()))
                 .build();
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override @Transactional // écrit dans l'historique : pas de transaction en lecture seule
     public byte[] exporterStatistiques(Filtres f, FormatFichier format) {
         Statistiques s = statistiques(f);
         List<List<String>> lignes = new ArrayList<>();
@@ -141,6 +158,7 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
         s.getSituationProfessionnelle().forEach(l -> lignes.add(List.of("Situation professionnelle", l.libelle(), String.valueOf(l.valeur()), l.pourcentage() + " %")));
         s.getPyramideAges().forEach(t -> lignes.add(List.of("Âge", t.getTranche(), t.getHommes() + " H / " + t.getFemmes() + " F", "")));
         s.getCompletudeParAnnee().forEach((a, v) -> lignes.add(List.of("Complétude", String.valueOf(a), v + " %", "")));
+        s.getCompetencesParAnnee().forEach((a, v) -> lignes.add(List.of("Compétences déclarées", String.valueOf(a), v + " %", "")));
         historiqueService.enregistrer("EXPORT", "STATISTIQUES", null, format.name());
         return generateur.tableau(new GenerateurFichiers.Tableau("Statistiques SNJPro (" + s.getTotalMembres() + " membres)",
                 List.of("Indicateur", "Valeur", "Effectif", "Part"), lignes), format);
@@ -205,7 +223,7 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
         return EstimationExport.builder().nombreMembres(n).tailleEstimeeOctets(n * 300 + 2048).build();
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override @Transactional // écrit dans l'historique : pas de transaction en lecture seule
     public Fichier exporterMembres(Export export) {
         List<Membre> membres = membresExport(export);
         Set<String> s = new HashSet<>(export.getSections());
@@ -218,19 +236,21 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
         if (s.contains("COMPETENCES")) entetes.add("Compétences");
         boolean masquer = export.isMasquerDonneesSensibles();
         List<List<String>> lignes = membres.stream().map(m -> {
-            List<String> l = new ArrayList<>(List.of(m.getIdentifiantSnj()));
-            if (s.contains("IDENTITE")) l.addAll(List.of(m.getPrenom(), m.getNom(), m.getSexe().name(),
+            // nvl partout : List.of refuse les valeurs nulles (fiche incomplète = cellule vide)
+            List<String> l = new ArrayList<>(List.of(nvl(m.getIdentifiantSnj())));
+            if (s.contains("IDENTITE")) l.addAll(List.of(nvl(m.getPrenom()), nvl(m.getNom()), m.getSexe() == null ? "" : m.getSexe().name(),
                     m.getDateNaissance() == null ? "" : m.getDateNaissance().format(DATE), nvl(m.getLieuNaissance())));
             if (s.contains("CONTACT")) l.addAll(List.of(masquer ? masquerTel(m.getNumeroTelephone()) : nvl(m.getNumeroTelephone()),
                     masquer ? masquerEmail(m.getEmail()) : nvl(m.getEmail())));
-            if (s.contains("COHORTE")) l.addAll(List.of(m.getCohorte().getNom(), m.getStatut().name()));
+            if (s.contains("COHORTE")) l.addAll(List.of(m.getCohorte() == null ? "" : nvl(m.getCohorte().getNom()),
+                    m.getStatut() == null ? "" : m.getStatut().name()));
             if (s.contains("LOCALISATION")) {
                 Localisation loc = m.getLocalisation();
                 l.addAll(List.of(loc == null ? "" : nvl(loc.getRegion()), loc == null ? "" : nvl(loc.getCercle()), loc == null ? "" : nvl(loc.getCommune())));
             }
             if (s.contains("SITUATION")) {
                 SituationProfessionnelle sp = m.getSituationProfessionnelle();
-                l.addAll(List.of(sp == null ? "" : libelleStatut(sp.getStatut()), sp == null ? "" : nvl(sp.getProfession()),
+                l.addAll(List.of(sp == null || sp.getStatut() == null ? "" : nvl(libelleStatut(sp.getStatut())), sp == null ? "" : nvl(sp.getProfession()),
                         sp == null ? "" : nvl(sp.getNomEmployeur())));
             }
             if (s.contains("COMPETENCES")) l.add(m.getCompetences().stream()
@@ -268,7 +288,7 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
                 yield new GenerateurFichiers.Tableau("Effectifs par cohorte", List.of("Cohorte", "Statut", "Recrues", "Membres", "Actifs", "Femmes", "Profils complets"), l);
             }
             case COMPETENCES -> new GenerateurFichiers.Tableau("Répartition par compétences", List.of("Compétence", "Catégorie", "Membres", "Niveau moyen /4"),
-                    competenceService.lister(null, null, "MEMBRES").stream()
+                    competenceService.lister(null, null, "MEMBRES", false).stream()
                             .map(c -> List.of(c.getNom(), c.getCategorie(), String.valueOf(c.getNombreMembres()),
                                     c.getNiveauMoyen() == null ? "" : String.valueOf(c.getNiveauMoyen()))).toList());
             case MOBILISATIONS -> new GenerateurFichiers.Tableau("Bilan des mobilisations", List.of("Mobilisation", "Début", "Statut", "Sollicités", "Disponibles", "Indisponibles"),
@@ -299,9 +319,14 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
     }
 
     private List<Membre> membresExport(Export export) {
-        MembreFilterDTO f = export.getFiltres() != null ? export.getFiltres() : new MembreFilterDTO();
+        // Membres cochés : on exporte exactement la sélection, sans les filtres de la liste
+        // (le périmètre de l'utilisateur reste appliqué : un responsable ne peut pas exporter hors de sa cohorte).
+        boolean selection = export.getIds() != null && !export.getIds().isEmpty();
+        MembreFilterDTO f = selection || export.getFiltres() == null ? new MembreFilterDTO() : export.getFiltres();
         perimetre.restreindre(f);
-        return membreRepository.findAll(MembreSpecification.avecFiltres(f));
+        Specification<Membre> spec = MembreSpecification.avecFiltres(f);
+        if (selection) spec = spec.and((root, query, cb) -> root.get("id").in(export.getIds()));
+        return membreRepository.findAll(spec);
     }
 
     private List<Membre> filtrer(Filtres f) {

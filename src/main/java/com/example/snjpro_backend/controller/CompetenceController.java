@@ -27,18 +27,20 @@ public class CompetenceController {
 
     @GetMapping("/api/competences")
     @PreAuthorize(LECTURE)
-    @Operation(summary = "Lister les compétences (filtres : catégorie, recherche ; tri : MEMBRES, NOM, RECENTES)")
+    @Operation(summary = "Lister les compétences (filtres : catégorie, recherche ; tri : MEMBRES, NOM, RECENTES)",
+            description = "Responsable de cohorte : par défaut, seules les compétences des membres de sa cohorte ; toutes=true pour l'ensemble des cohortes.")
     public ResponseEntity<List<Competence>> lister(@RequestParam(required = false) String categorie,
                                                    @RequestParam(required = false) String recherche,
-                                                   @RequestParam(defaultValue = "MEMBRES") String tri) {
-        return ResponseEntity.ok(service.lister(categorie, recherche, tri));
+                                                   @RequestParam(defaultValue = "MEMBRES") String tri,
+                                                   @RequestParam(defaultValue = "false") boolean toutes) {
+        return ResponseEntity.ok(service.lister(categorie, recherche, tri, toutes));
     }
 
     @GetMapping("/api/competences/categories")
     @PreAuthorize(LECTURE)
     @Operation(summary = "Catégories avec le nombre de compétences et de membres")
-    public ResponseEntity<List<Categorie>> categories() {
-        return ResponseEntity.ok(service.categories());
+    public ResponseEntity<List<Categorie>> categories(@RequestParam(defaultValue = "false") boolean toutes) {
+        return ResponseEntity.ok(service.categories(toutes));
     }
 
     @GetMapping("/api/competences/{id}")
@@ -95,6 +97,6 @@ public class CompetenceController {
     @PreAuthorize("hasRole('MEMBRE')")
     @Operation(summary = "Rechercher dans le référentiel (écran « Ajouter une compétence »)")
     public ResponseEntity<List<Competence>> referentielMembre(@RequestParam(required = false) String recherche) {
-        return ResponseEntity.ok(service.lister(null, recherche, "MEMBRES"));
+        return ResponseEntity.ok(service.lister(null, recherche, "MEMBRES", true));
     }
 }

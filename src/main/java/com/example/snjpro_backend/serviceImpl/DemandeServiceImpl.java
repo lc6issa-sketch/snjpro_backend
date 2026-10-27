@@ -182,6 +182,8 @@ public class DemandeServiceImpl implements DemandeServiceInterface {
         evenement(d, region != null ? "Reçue par la direction régionale de " + region : "Reçue par la direction du SNJ", null);
         notificationService.alerterRoles(List.of(RoleEnum.ROLE_ADMIN_SNJ, RoleEnum.ROLE_RESPONSABLE_REGIONAL), region,
                 "Nouvelle demande", m.getPrenom() + " " + m.getNom() + " · " + d.getObjet(), "DEMANDE", "DEMANDE", d.getId());
+        notificationService.alerterResponsablesCohorte(m.getCohorte().getId(),
+                "Nouvelle demande", m.getPrenom() + " " + m.getNom() + " · " + d.getObjet(), "DEMANDE", "DEMANDE", d.getId());
         historiqueService.enregistrer("CREATION", ENTITE, d.getId(), d.getNumeroSuivi() + " · " + d.getObjet());
         return toDetail(d);
     }
@@ -196,8 +198,12 @@ public class DemandeServiceImpl implements DemandeServiceInterface {
         d.setStatut(StatutDemande.EN_COURS);
         evenement(d, "Complément envoyé par le membre", message);
         if (d.getTraitePar() != null)
+        {
             notificationService.alerterRoles(List.of(RoleEnum.ROLE_ADMIN_SNJ), null, "Complément reçu",
                     d.getNumeroSuivi() + " · " + d.getObjet(), "DEMANDE", "DEMANDE", id);
+            notificationService.alerterResponsablesCohorte(d.getMembre().getCohorte().getId(), "Complément reçu",
+                    d.getNumeroSuivi() + " · " + d.getObjet(), "DEMANDE", "DEMANDE", id);
+        }
         return toDetail(demandeRepository.save(d));
     }
 
@@ -306,9 +312,14 @@ public class DemandeServiceImpl implements DemandeServiceInterface {
 
     private String prochainNumero() {
         String prefixe = "DEM-" + LocalDate.now().getYear() + "-";
-        String dernier = demandeRepository.dernierNumero(prefixe);
-        int suivant = dernier == null ? 1 : Integer.parseInt(dernier.substring(prefixe.length())) + 1;
-        return prefixe + String.format("%04d", suivant);
+        // Seuls les suffixes numériques comptent : les données de test utilisent « DEM-2026-T012 »,
+        // qu'un MAX() alphabétique placerait après « DEM-2026-0421 ».
+        int dernier = demandeRepository.numerosAvecPrefixe(prefixe).stream()
+                .map(n -> n.substring(prefixe.length()))
+                .filter(s -> s.matches("\\d{1,9}"))
+                .mapToInt(Integer::parseInt)
+                .max().orElse(0);
+        return prefixe + String.format("%04d", dernier + 1);
     }
 
     private Demande trouverGerable(Long id) {

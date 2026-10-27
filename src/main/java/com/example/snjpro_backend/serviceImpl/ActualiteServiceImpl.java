@@ -4,6 +4,7 @@ import com.example.snjpro_backend.dto.ActualiteDTOs.*;
 import com.example.snjpro_backend.entity.Actualite;
 import com.example.snjpro_backend.entity.InscriptionActualite;
 import com.example.snjpro_backend.entity.Membre;
+import com.example.snjpro_backend.entity.User;
 import com.example.snjpro_backend.enumeration.Enumerations.CategorieActualite;
 import com.example.snjpro_backend.enumeration.Enumerations.CibleNotification;
 import com.example.snjpro_backend.enumeration.Enumerations.StatutActualite;
@@ -50,7 +51,9 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public List<Resume> lister(StatutActualite statut, CategorieActualite categorie, String recherche) {
+        User u = perimetre.utilisateurCourant();
         return actualiteRepository.findAllByOrderByDateCreationDesc().stream()
+                .filter(a -> gerable(a, u))
                 .filter(a -> statut == null || a.getStatut() == statut)
                 .filter(a -> categorie == null || a.getCategorie() == categorie)
                 .filter(a -> !StringUtils.hasText(recherche) || a.getTitre().toLowerCase().contains(recherche.trim().toLowerCase()))
@@ -60,17 +63,20 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public Compteurs compteurs() {
+        User u = perimetre.utilisateurCourant();
+        List<Actualite> l = actualiteRepository.findAllByOrderByDateCreationDesc().stream().filter(a -> gerable(a, u)).toList();
+        java.util.function.Function<StatutActualite, Long> nb = s -> l.stream().filter(a -> a.getStatut() == s).count();
         return Compteurs.builder()
-                .toutes(actualiteRepository.count())
-                .publiees(actualiteRepository.countByStatut(StatutActualite.PUBLIEE))
-                .brouillons(actualiteRepository.countByStatut(StatutActualite.BROUILLON))
-                .programmees(actualiteRepository.countByStatut(StatutActualite.PROGRAMMEE))
-                .archivees(actualiteRepository.countByStatut(StatutActualite.ARCHIVEE))
+                .toutes(l.size())
+                .publiees(nb.apply(StatutActualite.PUBLIEE))
+                .brouillons(nb.apply(StatutActualite.BROUILLON))
+                .programmees(nb.apply(StatutActualite.PROGRAMMEE))
+                .archivees(nb.apply(StatutActualite.ARCHIVEE))
                 .build();
     }
 
     @Override @Transactional(readOnly = true)
-    public Detail obtenir(Long id) { return toDetail(trouver(id), null); }
+    public Detail obtenir(Long id) { return toDetail(trouverGerable(id), null); }
 
     @Override
     public Detail creer(Edition dto) {
@@ -85,7 +91,7 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
 
     @Override
     public Detail modifier(Long id, Edition dto) {
-        Actualite a = trouver(id);
+        Actualite a = trouverGerable(id);
         boolean publiee = a.getStatut() == StatutActualite.PUBLIEE;
         appliquer(a, dto);
         if (publiee) a.setStatut(StatutActualite.PUBLIEE);
@@ -97,7 +103,7 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
 
     @Override
     public Detail publier(Long id) {
-        Actualite a = trouver(id);
+        Actualite a = trouverGerable(id);
         if (a.getStatut() == StatutActualite.PUBLIEE) throw new ConflitException("Cette actualité est déjà publiée.");
         diffuser(a);
         historiqueService.enregistrer("PUBLICATION", ENTITE, id, a.getTitre());
@@ -106,7 +112,7 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
 
     @Override
     public Detail archiver(Long id) {
-        Actualite a = trouver(id);
+        Actualite a = trouverGerable(id);
         a.setStatut(StatutActualite.ARCHIVEE);
         historiqueService.enregistrer("ARCHIVAGE", ENTITE, id, a.getTitre());
         return toDetail(actualiteRepository.save(a), null);
@@ -114,7 +120,7 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
 
     @Override
     public void supprimer(Long id) {
-        Actualite a = trouver(id);
+        Actualite a = trouverGerable(id);
         if (a.getStatut() == StatutActualite.PUBLIEE)
             throw new ConflitException("Archivez d'abord l'actualité publiée avant de la supprimer.");
         inscriptionRepository.deleteAll(inscriptionRepository.findByActualiteIdOrderByDateInscriptionDesc(id));
@@ -125,7 +131,7 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
 
     @Override
     public Detail changerImage(Long id, MultipartFile image) {
-        Actualite a = trouver(id);
+        Actualite a = trouverGerable(id);
         if (!StockageFichierService.typeMime(image.getOriginalFilename()).startsWith("image/"))
             throw new IllegalArgumentException("L'image de couverture doit être au format PNG, JPG, GIF ou WEBP.");
         String ancienne = a.getImageChemin();
@@ -139,7 +145,7 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public List<Inscrit> inscrits(Long id) {
-        trouver(id);
+        trouverGerable(id);
         return inscriptionRepository.findByActualiteIdOrderByDateInscriptionDesc(id).stream()
                 .map(i -> Inscrit.builder()
                         .membreId(i.getMembre().getId()).identifiantSnj(i.getMembre().getIdentifiantSnj())
@@ -224,7 +230,7 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
         if (dto.getStatut() == StatutActualite.PROGRAMMEE
                 && (dto.getDatePublication() == null || !dto.getDatePublication().isAfter(LocalDateTime.now())))
             throw new IllegalArgumentException("Une publication programmée doit avoir une date de publication future.");
-        if (dto.getCible() != CibleNotification.TOUS && dto.getValeurs().isEmpty())
+        if (dto.getCible() != CibleNotification.TOUS && dto.getValeurs().isEmpty() && !perimetre.estResponsable(perimetre.utilisateurCourant()))
             throw new IllegalArgumentException("Précisez les régions ou cohortes visées.");
         a.setTitre(dto.getTitre().trim());
         a.setSousTitre(dto.getSousTitre());
@@ -238,8 +244,13 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
             a.setStatut(StatutActualite.BROUILLON);
         }
         a.setDateExpiration(dto.getDateExpiration());
-        a.setCible(dto.getCible());
-        a.setCibleValeurs(MobilisationServiceImpl.joindre(dto.getValeurs()));
+        // Un responsable publie uniquement pour sa région (régional) ou sa cohorte (cohorte)
+        User u = perimetre.utilisateurCourant();
+        switch (u.getRole()) {
+            case ROLE_RESPONSABLE_REGIONAL -> { a.setCible(CibleNotification.REGION); a.setCibleValeurs(u.getRegion()); }
+            case ROLE_RESPONSABLE_COHORTE -> { a.setCible(CibleNotification.COHORTE); a.setCibleValeurs(String.valueOf(u.getCohorteId())); }
+            default -> { a.setCible(dto.getCible()); a.setCibleValeurs(MobilisationServiceImpl.joindre(dto.getValeurs())); }
+        }
         a.setNotifierMembres(dto.isNotifierMembres());
         a.setEpingle(dto.isEpingle());
         a.setInscriptionsOuvertes(dto.isInscriptionsOuvertes());
@@ -273,6 +284,18 @@ public class ActualiteServiceImpl implements ActualiteServiceInterface {
         Actualite a = trouver(id);
         if (a.getStatut() != StatutActualite.PUBLIEE || !visiblePour(a, m))
             throw new EntityNotFoundException("Actualité non trouvée : " + id);
+        return a;
+    }
+
+    /** Administrateurs et direction gèrent toutes les actualités ; un responsable uniquement celles qu'il a rédigées. */
+    private boolean gerable(Actualite a, User u) {
+        return !perimetre.estResponsable(u) || u.getUsername().equals(a.getAuteur());
+    }
+
+    private Actualite trouverGerable(Long id) {
+        Actualite a = trouver(id);
+        if (!gerable(a, perimetre.utilisateurCourant()))
+            throw new org.springframework.security.access.AccessDeniedException("Cette actualité ne fait pas partie de votre périmètre.");
         return a;
     }
 

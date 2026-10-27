@@ -35,6 +35,8 @@ public interface NotificationServiceInterface {
     // Alertes du panneau web
     void alerterRoles(Collection<RoleEnum> roles, String region, String titre, String message, String type,
                       String lienType, Long lienId);
+    /** Alerte les responsables de la cohorte indiquée (et uniquement eux). */
+    void alerterResponsablesCohorte(Long cohorteId, String titre, String message, String type, String lienType, Long lienId);
     void alerterUtilisateur(Long userId, String titre, String message, String type, String lienType, Long lienId);
     Page<Alerte> mesAlertes(boolean nonLues, Pageable pageable);
     long compterAlertesNonLues();

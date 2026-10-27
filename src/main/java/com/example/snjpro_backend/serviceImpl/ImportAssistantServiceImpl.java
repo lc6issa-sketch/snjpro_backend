@@ -8,6 +8,7 @@ import com.example.snjpro_backend.enumeration.Enumerations.DecisionDoublon;
 import com.example.snjpro_backend.enumeration.Enumerations.FormatFichier;
 import com.example.snjpro_backend.enumeration.Enumerations.StatutImport;
 import com.example.snjpro_backend.enumeration.RoleEnum;
+import org.springframework.security.access.AccessDeniedException;
 import com.example.snjpro_backend.enumeration.StatutCohorteEnum;
 import com.example.snjpro_backend.enumeration.StatutMembreEnum;
 import com.example.snjpro_backend.enumeration.StatutProfessionnelEnum;
@@ -32,6 +33,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -90,6 +92,7 @@ public class ImportAssistantServiceImpl implements ImportAssistantServiceInterfa
     public Analyse analyser(MultipartFile fichier, Long cohorteId) {
         if (fichier == null || fichier.isEmpty())
             throw new IllegalArgumentException("Aucun fichier fourni ou fichier vide.");
+        perimetre.exigerCohorte(cohorteId);
         Cohorte cohorte = cohorte(cohorteId);
         if (cohorte.getStatut() == StatutCohorteEnum.ARCHIVEE)
             throw new ConflitException("Impossible d'importer dans une cohorte archivée.");
@@ -128,7 +131,11 @@ public class ImportAssistantServiceImpl implements ImportAssistantServiceInterfa
 
     @Override @Transactional(readOnly = true)
     public Page<Session> lister(Pageable pageable) {
-        return sessionRepository.findAllByOrderByDateCreationDesc(pageable).map(this::toSession);
+        User user = perimetre.utilisateurCourant();
+        Page<ImportSession> sessions = user.getRole() == RoleEnum.ROLE_RESPONSABLE_COHORTE
+                ? sessionRepository.findByCohorteIdOrderByDateCreationDesc(user.getCohorteId(), pageable)
+                : sessionRepository.findAllByOrderByDateCreationDesc(pageable);
+        return sessions.map(this::toSession);
     }
 
     @Override @Transactional(readOnly = true)
@@ -183,6 +190,8 @@ public class ImportAssistantServiceImpl implements ImportAssistantServiceInterfa
                 .orElseThrow(() -> new EntityNotFoundException("Aucun doublon à la ligne " + ligne));
         if (decision == DecisionDoublon.FUSIONNER && l.existant() == null)
             throw new IllegalArgumentException("Fusion impossible : ce doublon est interne au fichier (aucune fiche existante).");
+        if (decision == DecisionDoublon.FUSIONNER && !peutFusionner(l.existant()))
+            throw new AccessDeniedException("Fusion impossible : la fiche existante n'appartient pas à votre cohorte.");
         Map<String, DecisionDoublon> decisions = decisions(s);
         decisions.put(String.valueOf(ligne), decision);
         s.setDecisions(json(decisions));
@@ -198,7 +207,7 @@ public class ImportAssistantServiceImpl implements ImportAssistantServiceInterfa
         Map<String, DecisionDoublon> decisions = decisions(s);
         for (LigneAnalysee l : lignes) {
             if (!l.doublon()) continue;
-            DecisionDoublon d = decision == DecisionDoublon.FUSIONNER && l.existant() == null ? DecisionDoublon.IGNORER : decision;
+            DecisionDoublon d = decision == DecisionDoublon.FUSIONNER && !peutFusionner(l.existant()) ? DecisionDoublon.IGNORER : decision;
             decisions.put(String.valueOf(l.numero()), d);
         }
         s.setDecisions(json(decisions));
@@ -230,7 +239,8 @@ public class ImportAssistantServiceImpl implements ImportAssistantServiceInterfa
                 // doublon sans décision : ignoré par prudence
                 DecisionDoublon d = decisions.getOrDefault(String.valueOf(l.numero()), DecisionDoublon.IGNORER);
                 if (d == DecisionDoublon.IGNORER) { ignores++; continue; }
-                if (d == DecisionDoublon.FUSIONNER && l.existant() != null) {
+                if (d == DecisionDoublon.FUSIONNER && !peutFusionner(l.existant())) { ignores++; continue; }
+                if (d == DecisionDoublon.FUSIONNER) {
                     fusionner(l.existant(), l.membre(), auteur);
                     fusionnes.add(l.existant().getIdentifiantSnj());
                     continue;
@@ -515,7 +525,9 @@ public class ImportAssistantServiceImpl implements ImportAssistantServiceInterfa
         return switch (champ) {
             case "prenom", "nom" -> valeur.isEmpty() ? "Renseignez la valeur dans le fichier" : "Raccourcissez la valeur à 50 caractères";
             case "sexe" -> "Utilisez M ou F";
-            case "dateNaissance" -> chiffres.length() == 8
+            case "dateNaissance" -> e.getMessage() != null && e.getMessage().contains(" ans")
+                    ? "Vérifiez la date : le membre doit être né avant le " + LocalDate.now().minusYears(MembreServiceImpl.AGE_MINIMUM).format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                    : chiffres.length() == 8
                     ? "Essayez " + chiffres.substring(0, 2) + "/" + chiffres.substring(2, 4) + "/" + chiffres.substring(4)
                     : "Format attendu : JJ/MM/AAAA (ex : 15/03/1998)";
             case "telephone" -> chiffres.length() == 8 ? "Essayez +223" + chiffres : "Format attendu : +223 suivi de 8 chiffres";
@@ -596,7 +608,14 @@ public class ImportAssistantServiceImpl implements ImportAssistantServiceInterfa
     }
 
     private ImportSession session(Long id) {
-        return sessionRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Import non trouvé : " + id));
+        ImportSession s = sessionRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Import non trouvé : " + id));
+        perimetre.exigerCohorte(s.getCohorteId());
+        return s;
+    }
+
+    /** Une fusion modifie la fiche existante : interdite si cette fiche est hors du périmètre de l'utilisateur. */
+    private boolean peutFusionner(Membre existant) {
+        return existant != null && perimetre.couvre(existant);
     }
 
     private ImportSession modifiable(Long id) {

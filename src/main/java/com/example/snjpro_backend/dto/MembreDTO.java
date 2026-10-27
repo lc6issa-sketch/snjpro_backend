@@ -33,8 +33,11 @@ public class MembreDTO {
     private String photoUrl;
     @Pattern(regexp = "^\\+?[0-9 ]{8,20}$", message = "Numéro de téléphone invalide")
     private String telephoneSecondaire;
+    /** Nom de la personne à prévenir. */
     @Size(max = 150)
     private String personneAPrevenir;
+    @Pattern(regexp = "^\\+?[0-9 ]{8,20}$", message = "Numéro de la personne à prévenir invalide")
+    private String personneAPrevenirTelephone;
     @Size(max = 50)
     private String nationalite;
     @Pattern(regexp = "^(A|B|AB|O)[+-]$", message = "Groupe sanguin attendu : A+, A-, B+, B-, AB+, AB-, O+ ou O-")
@@ -45,12 +48,16 @@ public class MembreDTO {
     private Double poids;
     @Size(max = 50)
     private String dernierDiplome;
+    /** Diplômes obtenus ; le plus élevé devient le dernier diplôme. */
+    private java.util.List<@Size(max = 50) String> diplomes;
     @Pattern(regexp = "^(FONCTIONNAIRE|NON_FONCTIONNAIRE)$", message = "Catégorie attendue : FONCTIONNAIRE ou NON_FONCTIONNAIRE")
     private String categorie;
     @Size(max = 50)
     private String compagnie;
     @Size(max = 50)
     private String section;
+    @Size(max = 50)
+    private String brigade;
     private java.time.LocalDate dateIncorporation;
     private Boolean disponibleMobilisation;
     private StatutMembreEnum statut;

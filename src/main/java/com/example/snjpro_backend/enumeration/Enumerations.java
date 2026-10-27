@@ -8,6 +8,9 @@ public final class Enumerations {
 
     public enum TypeCodeVerification { CONNEXION, ACTIVATION, REINITIALISATION, VERIFICATION_TELEPHONE, INVITATION }
 
+    /** Logo de l'application : VERT (logo historique, charte verte) ou OR (écusson, charte noir et or). */
+    public enum LogoApplication { VERT, OR }
+
     public enum StatutMobilisation { BROUILLON, PLANIFIEE, EN_COURS, CLOTUREE }
     public enum ReponseMobilisation { EN_ATTENTE, DISPONIBLE, INDISPONIBLE }
 

@@ -28,4 +28,5 @@ public class UserDTO {
     private String region;
     /** Obligatoire pour ROLE_RESPONSABLE_COHORTE. */
     private Long cohorteId;
+    //noob saybot
 }

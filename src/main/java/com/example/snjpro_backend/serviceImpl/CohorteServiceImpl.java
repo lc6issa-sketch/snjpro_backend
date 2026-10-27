@@ -28,6 +28,7 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
     private final com.example.snjpro_backend.repository.UserRepository userRepository;
     private final com.example.snjpro_backend.repository.ParticipationMobilisationRepository participationRepository;
     private final com.example.snjpro_backend.serviceInterface.NotificationServiceInterface notificationService;
+    private final com.example.snjpro_backend.security.PerimetreService perimetre;
 
     @Override
     public CohorteDTO creerCohorte(CohorteDTO dto) {
@@ -77,12 +78,15 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public CohorteDTO obtenirCohorte(Long id) {
+        perimetre.exigerCohorte(id);
         return toDTO(trouver(id));
     }
 
     @Override @Transactional(readOnly = true)
     public List<CohorteDTO> obtenirToutesLesCohortes(StatutCohorteEnum statut, String nom) {
+        com.example.snjpro_backend.entity.User u = perimetre.utilisateurCourant();
         return cohorteRepository.findAll(Sort.by(Sort.Direction.DESC, "anneeDebut").and(Sort.by("nom"))).stream()
+                .filter(c -> perimetre.voitCohorte(u, c.getId()))
                 .filter(c -> statut == null || c.getStatut() == statut)
                 .filter(c -> !StringUtils.hasText(nom) || c.getNom().toLowerCase().contains(nom.trim().toLowerCase()))
                 .map(this::toDTO)
@@ -121,6 +125,7 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public long compterMembresCohorte(Long id) {
+        perimetre.exigerCohorte(id);
         trouver(id);
         return cohorteRepository.countMembresInCohorte(id);
     }
@@ -147,9 +152,11 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public java.util.Map<String, Object> tableauDeBord(Long id) {
+        perimetre.exigerCohorte(id);
         Cohorte c = trouver(id);
+        // Responsable régional : uniquement les membres de sa région
         java.util.List<com.example.snjpro_backend.entity.Membre> membres = membreRepository.findAll().stream()
-                .filter(m -> m.getCohorte().getId().equals(id)).toList();
+                .filter(m -> m.getCohorte().getId().equals(id)).filter(perimetre::couvre).toList();
         long actifs = membres.stream().filter(m -> m.getStatut() == com.example.snjpro_backend.enumeration.StatutMembreEnum.ACTIF).count();
         long complets = membres.stream().filter(CompletudeProfil::complet).count();
         java.time.LocalDateTime debutAnnee = java.time.LocalDate.now().withDayOfYear(1).atStartOfDay();
@@ -182,9 +189,11 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public java.util.Map<String, Long> compteurs() {
+        com.example.snjpro_backend.entity.User u = perimetre.utilisateurCourant();
+        List<Cohorte> visibles = cohorteRepository.findAll().stream().filter(c -> perimetre.voitCohorte(u, c.getId())).toList();
         java.util.Map<String, Long> r = new java.util.LinkedHashMap<>();
-        r.put("TOUTES", cohorteRepository.count());
-        for (StatutCohorteEnum s : StatutCohorteEnum.values()) r.put(s.name(), (long) cohorteRepository.findByStatut(s).size());
+        r.put("TOUTES", (long) visibles.size());
+        for (StatutCohorteEnum s : StatutCohorteEnum.values()) r.put(s.name(), visibles.stream().filter(c -> c.getStatut() == s).count());
         return r;
     }
 

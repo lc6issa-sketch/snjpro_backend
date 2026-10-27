@@ -13,6 +13,7 @@ import java.util.List;
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
     Page<Notification> findAllByOrderByDateCreationDesc(Pageable pageable);
+    Page<Notification> findByEmetteurOrderByDateCreationDesc(String emetteur, Pageable pageable);
     List<Notification> findByStatutAndProgrammeLeLessThanEqual(StatutNotification statut, LocalDateTime date);
     List<Notification> findByDateEnvoiAfter(LocalDateTime date);
 }

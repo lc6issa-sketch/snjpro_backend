@@ -55,8 +55,12 @@ public class Membre {
     @Column(name = "telephone_verifie")
     private Boolean telephoneVerifie;
 
+    /** Nom de la personne à prévenir. */
     @Column(name = "personne_a_prevenir", length = 150)
     private String personneAPrevenir;
+
+    @Column(name = "personne_a_prevenir_telephone", length = 20)
+    private String personneAPrevenirTelephone;
 
     @Column(length = 50)
     private String nationalite;
@@ -70,8 +74,17 @@ public class Membre {
     /** Poids en kilogrammes. */
     private Double poids;
 
+    /** Diplôme le plus élevé, déduit de la liste des diplômes. */
     @Column(name = "dernier_diplome", length = 50)
     private String dernierDiplome;
+
+    /** Diplômes obtenus, dans l'ordre de saisie. */
+    @ElementCollection
+    @CollectionTable(name = "membre_diplomes", joinColumns = @JoinColumn(name = "membre_id"))
+    @OrderColumn(name = "ordre")
+    @Column(name = "diplome", length = 50)
+    @Builder.Default
+    private List<String> diplomes = new ArrayList<>();
 
     /** FONCTIONNAIRE ou NON_FONCTIONNAIRE. */
     @Column(length = 30)
@@ -82,6 +95,9 @@ public class Membre {
 
     @Column(length = 50)
     private String section;
+
+    @Column(length = 50)
+    private String brigade;
 
     @Column(name = "date_incorporation")
     private LocalDate dateIncorporation;

@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -35,6 +36,8 @@ import java.util.stream.Stream;
 @Transactional
 public class MembreServiceImpl implements MembreServiceInterface {
     private static final String ENTITE = "MEMBRE";
+    /** Âge minimal d'un membre à l'enregistrement. */
+    public static final int AGE_MINIMUM = 18;
 
     private final MembreRepository membreRepository;
     private final CohorteRepository cohorteRepository;
@@ -51,6 +54,8 @@ public class MembreServiceImpl implements MembreServiceInterface {
 
     @Override
     public MembreResponseDTO ajouterMembre(MembreDTO dto, String createdBy, boolean forcer) {
+        if (dto.getDateNaissance() != null && dto.getDateNaissance().isAfter(LocalDate.now().minusYears(AGE_MINIMUM)))
+            throw new IllegalArgumentException("Le membre doit avoir au moins " + AGE_MINIMUM + " ans.");
         Cohorte cohorte = trouverCohorte(dto.getCohorteId());
         if (cohorte.getStatut() == StatutCohorteEnum.ARCHIVEE)
             throw new ConflitException("Impossible d'ajouter un membre à une cohorte archivée.");
@@ -298,14 +303,22 @@ public class MembreServiceImpl implements MembreServiceInterface {
     private void appliquerComplements(Membre m, MembreDTO dto) {
         if (dto.getTelephoneSecondaire() != null) m.setTelephoneSecondaire(DoublonDetecteur.normaliserTelephone(dto.getTelephoneSecondaire()));
         if (dto.getPersonneAPrevenir() != null) m.setPersonneAPrevenir(dto.getPersonneAPrevenir());
+        if (dto.getPersonneAPrevenirTelephone() != null)
+            m.setPersonneAPrevenirTelephone(DoublonDetecteur.normaliserTelephone(dto.getPersonneAPrevenirTelephone()));
         if (dto.getNationalite() != null) m.setNationalite(dto.getNationalite());
         if (dto.getGroupeSanguin() != null) m.setGroupeSanguin(dto.getGroupeSanguin());
         if (dto.getTaille() != null) m.setTaille(dto.getTaille());
         if (dto.getPoids() != null) m.setPoids(dto.getPoids());
-        if (dto.getDernierDiplome() != null) m.setDernierDiplome(dto.getDernierDiplome());
+        if (dto.getDiplomes() != null) {
+            List<String> diplomes = Diplomes.nettoyer(dto.getDiplomes());
+            m.getDiplomes().clear();
+            m.getDiplomes().addAll(diplomes);
+            m.setDernierDiplome(Diplomes.plusEleve(diplomes));
+        } else if (dto.getDernierDiplome() != null) m.setDernierDiplome(dto.getDernierDiplome());
         if (dto.getCategorie() != null) m.setCategorie(dto.getCategorie());
         if (dto.getCompagnie() != null) m.setCompagnie(dto.getCompagnie());
         if (dto.getSection() != null) m.setSection(dto.getSection());
+        if (dto.getBrigade() != null) m.setBrigade(dto.getBrigade());
         if (dto.getDateIncorporation() != null) m.setDateIncorporation(dto.getDateIncorporation());
         if (dto.getDisponibleMobilisation() != null) m.setDisponibleMobilisation(dto.getDisponibleMobilisation());
     }

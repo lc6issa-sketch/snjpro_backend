@@ -78,5 +78,11 @@ public final class MessagerieDTOs {
         private String service;
         private boolean enLigne;
         private String delaiReponse;
+        /** Contacts de type MEMBRE : matricule, cohorte et localisation. */
+        private String identifiantSnj;
+        private String cohorteNom;
+        private boolean memeCohorte;
+        private String region;
+        private String localisation;
     }
 }

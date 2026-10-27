@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -56,8 +57,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
     public List<Resume> lister(StatutActivite statut, Integer annee, Integer mois) {
         User u = perimetre.utilisateurCourant();
         return activiteRepository.findAllByOrderByDateDesc().stream()
-                .filter(a -> u.getRole() != RoleEnum.ROLE_RESPONSABLE_REGIONAL || a.getRegion() == null
-                        || a.getRegion().equalsIgnoreCase(u.getRegion()))
+                .filter(a -> gerable(a, u))
                 .filter(a -> statut == null || statut(a) == statut)
                 .filter(a -> annee == null || a.getDate().getYear() == annee)
                 .filter(a -> mois == null || a.getDate().getMonthValue() == mois)
@@ -66,7 +66,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
     }
 
     @Override @Transactional(readOnly = true)
-    public Resume obtenir(Long id) { return toResume(trouver(id)); }
+    public Resume obtenir(Long id) { return toResume(trouverGerable(id)); }
 
     @Override
     public Resume creer(Edition dto) {
@@ -82,7 +82,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
 
     @Override
     public Resume modifier(Long id, Edition dto) {
-        Activite a = trouver(id);
+        Activite a = trouverGerable(id);
         appliquer(a, dto);
         historiqueService.enregistrer("MODIFICATION", ENTITE, id, a.getTitre());
         return toResume(activiteRepository.save(a));
@@ -90,7 +90,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
 
     @Override
     public Resume terminer(Long id) {
-        Activite a = trouver(id);
+        Activite a = trouverGerable(id);
         a.setStatut(StatutActivite.TERMINEE);
         a.setQrActif(false);
         historiqueService.enregistrer("CLOTURE", ENTITE, id, a.getTitre());
@@ -99,7 +99,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
 
     @Override
     public void supprimer(Long id) {
-        Activite a = trouver(id);
+        Activite a = trouverGerable(id);
         if (presenceRepository.countByActiviteId(id) > 0)
             throw new ConflitException("Des présences sont enregistrées : terminez l'activité plutôt que de la supprimer.");
         activiteRepository.delete(a);
@@ -108,7 +108,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public CodeQr codeCourant(Long id) {
-        Activite a = trouver(id);
+        Activite a = trouverGerable(id);
         if (!a.isQrActif() || statut(a) == StatutActivite.TERMINEE)
             throw new ConflitException("Le QR code de présence n'est pas actif pour cette activité.");
         long maintenant = Instant.now().getEpochSecond();
@@ -122,7 +122,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
     @Override @Transactional(readOnly = true)
     public Projection projection(Long id) {
         return Projection.builder()
-                .activite(toResume(trouver(id)))
+                .activite(toResume(trouverGerable(id)))
                 .codeQr(codeCourant(id))
                 .dernieresArrivees(presenceRepository.findByActiviteIdOrderByDateHeureDesc(id, PageRequest.of(0, 5))
                         .map(this::toPresence).getContent())
@@ -131,15 +131,17 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
 
     @Override @Transactional(readOnly = true)
     public Page<PresenceDTO> presences(Long id, Pageable pageable) {
-        trouver(id);
+        trouverGerable(id);
         return presenceRepository.findByActiviteIdOrderByDateHeureDesc(id, pageable).map(this::toPresence);
     }
 
     @Override
     public PresenceDTO saisirPresence(Long id, SaisieManuelle dto) {
-        Activite a = trouver(id);
+        Activite a = trouverGerable(id);
         Membre m = membreRepository.findById(dto.getMembreId())
                 .orElseThrow(() -> new EntityNotFoundException("Membre non trouvé : " + dto.getMembreId()));
+        if (!perimetre.couvre(m))
+            throw new AccessDeniedException("Ce membre ne fait pas partie de votre périmètre.");
         if (presenceRepository.findByActiviteIdAndMembreId(id, m.getId()).isPresent())
             throw new ConflitException(m.getPrenom() + " " + m.getNom() + " est déjà enregistré(e) comme présent(e).");
         LocalDateTime heure = dto.getHeureArrivee() != null ? LocalDateTime.of(LocalDate.now(), dto.getHeureArrivee()) : LocalDateTime.now();
@@ -157,9 +159,9 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
         historiqueService.enregistrer("SUPPRESSION_PRESENCE", ENTITE, id, p.getMembre().getIdentifiantSnj());
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override @Transactional // écrit dans l'historique : pas de transaction en lecture seule
     public byte[] exporterPresences(Long id, FormatFichier format) {
-        Activite a = trouver(id);
+        Activite a = trouverGerable(id);
         List<List<String>> lignes = presenceRepository.findByActiviteIdOrderByDateHeureDesc(id).stream()
                 .map(this::toPresence)
                 .map(p -> List.of(p.getIdentifiantSnj(), p.getPrenom(), p.getNom(), p.getDateHeure().toString(),
@@ -180,6 +182,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
         String region = m.getLocalisation() != null ? m.getLocalisation().getRegion() : null;
         return activiteRepository.findAllByOrderByDateDesc().stream()
                 .filter(a -> statut(a) == StatutActivite.EN_COURS)
+                .filter(a -> a.getCohorteId() == null || a.getCohorteId().equals(m.getCohorte().getId()))
                 .filter(a -> a.getRegion() == null || a.getRegion().equalsIgnoreCase(region)
                         || (a.getMobilisation() != null && participationRepository
                         .findByMobilisationIdAndMembreId(a.getMobilisation().getId(), m.getId()).isPresent()))
@@ -221,6 +224,8 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
         } else {
             throw new IllegalArgumentException("Scannez le QR code ou saisissez le code de présence.");
         }
+        if (a.getCohorteId() != null && !a.getCohorteId().equals(m.getCohorte().getId()))
+            throw new ConflitException("Cette activité est réservée aux membres d'une autre cohorte.");
         if (horsLigne ? !enCoursLe(a, jour) : (!a.isQrActif() || statut(a) != StatutActivite.EN_COURS))
             throw new ConflitException(horsLigne
                     ? "L'activité n'avait pas lieu à la date du scan."
@@ -319,6 +324,8 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
         a.setHeureFin(dto.getHeureFin());
         a.setLieu(dto.getLieu());
         a.setRegion(u.getRole() == RoleEnum.ROLE_RESPONSABLE_REGIONAL ? u.getRegion() : dto.getRegion());
+        // Activité créée par un responsable de cohorte : réservée à sa cohorte
+        if (u.getRole() == RoleEnum.ROLE_RESPONSABLE_COHORTE) a.setCohorteId(u.getCohorteId());
         a.setQrActif(dto.isQrActif());
         a.setMobilisation(dto.getMobilisationId() == null ? null : mobilisationRepository.findById(dto.getMobilisationId())
                 .orElseThrow(() -> new EntityNotFoundException("Mobilisation non trouvée : " + dto.getMobilisationId())));
@@ -327,6 +334,27 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
     private Membre membreCourant() {
         return membreRepository.findById(perimetre.membreIdCourant())
                 .orElseThrow(() -> new EntityNotFoundException("Fiche membre introuvable."));
+    }
+
+    /**
+     * Administrateurs : toutes les activités. Responsable régional : celles qu'il a créées ou de sa région.
+     * Responsable de cohorte : celles qu'il a créées ou réservées à sa cohorte.
+     */
+    private boolean gerable(Activite a, User u) {
+        return switch (u.getRole()) {
+            case ROLE_RESPONSABLE_REGIONAL -> u.getUsername().equals(a.getCreePar())
+                    || (a.getRegion() != null && a.getRegion().equalsIgnoreCase(u.getRegion()));
+            case ROLE_RESPONSABLE_COHORTE -> u.getUsername().equals(a.getCreePar())
+                    || (a.getCohorteId() != null && a.getCohorteId().equals(u.getCohorteId()));
+            default -> true;
+        };
+    }
+
+    private Activite trouverGerable(Long id) {
+        Activite a = trouver(id);
+        if (!gerable(a, perimetre.utilisateurCourant()))
+            throw new AccessDeniedException("Cette activité ne fait pas partie de votre périmètre.");
+        return a;
     }
 
     private Activite trouver(Long id) {

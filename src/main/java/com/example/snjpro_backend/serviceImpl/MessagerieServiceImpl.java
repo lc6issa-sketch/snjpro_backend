@@ -5,6 +5,7 @@ import com.example.snjpro_backend.dto.MessagerieDTOs.*;
 import com.example.snjpro_backend.entity.*;
 import com.example.snjpro_backend.enumeration.Enumerations.TypeConversation;
 import com.example.snjpro_backend.enumeration.RoleEnum;
+import com.example.snjpro_backend.enumeration.StatutMembreEnum;
 import com.example.snjpro_backend.repository.*;
 import com.example.snjpro_backend.security.PerimetreService;
 import com.example.snjpro_backend.serviceInterface.MessagerieServiceInterface;
@@ -20,12 +21,15 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class MessagerieServiceImpl implements MessagerieServiceInterface {
     private static final int EN_LIGNE_MINUTES = 30;
+    /** Nombre maximal de membres renvoyés par une recherche de contacts. */
+    private static final int MAX_MEMBRES = 50;
 
     private final ConversationRepository conversationRepository;
     private final ParticipantConversationRepository participantRepository;
@@ -144,34 +148,81 @@ public class MessagerieServiceImpl implements MessagerieServiceInterface {
     }
 
     @Override @Transactional(readOnly = true)
-    public List<Contact> contacts(String recherche) {
+    public List<Contact> contacts(String recherche, String portee, String region, Long cohorteId) {
         User moi = perimetre.utilisateurCourant();
-        String q = StringUtils.hasText(recherche) ? recherche.trim().toLowerCase() : null;
+        String q = StringUtils.hasText(recherche) ? sansAccents(recherche.trim().toLowerCase()) : null;
         List<Contact> contacts = new ArrayList<>();
         Optional<Membre> moiMembre = membreRepository.findByUserId(moi.getId());
         if (moiMembre.isPresent()) {
             Membre m = moiMembre.get();
-            String region = m.getLocalisation() != null ? m.getLocalisation().getRegion() : null;
-            if (region != null)
-                contacts.add(Contact.builder().type("SERVICE").service("REGIONAL").nom("Direction régionale · " + region)
-                        .delaiReponse("Répond en ~2 h").build());
-            contacts.add(Contact.builder().type("SERVICE").service("NATIONAL").nom("Direction nationale du SNJ")
-                    .delaiReponse("Répond en ~24 h").build());
-            membreRepository.findAll().stream()
-                    .filter(x -> x.getCohorte().getId().equals(m.getCohorte().getId()) && x.getUserId() != null && !x.getId().equals(m.getId()))
-                    .limit(100)
-                    .forEach(x -> contacts.add(Contact.builder().type("MEMBRE").userId(x.getUserId()).membreId(x.getId())
-                            .nom(x.getPrenom() + " " + x.getNom())
-                            .detail(Objects.toString(x.getSituationProfessionnelle() != null ? x.getSituationProfessionnelle().getProfession() : null, "Membre")
-                                    + (x.getLocalisation() != null && x.getLocalisation().getRegion() != null ? " · " + x.getLocalisation().getRegion() : ""))
-                            .enLigne(enLigne(x.getUserId())).build()));
-        } else {
-            userRepository.findAll().stream()
-                    .filter(u -> u.isActif() && u.getRole() != RoleEnum.ROLE_MEMBRE && !u.getId().equals(moi.getId()))
-                    .forEach(u -> contacts.add(Contact.builder().type("UTILISATEUR").userId(u.getId()).nom(nom(u))
-                            .detail(libelleRole(u)).enLigne(enLigne(u.getId())).build()));
+            // Services du SNJ : proposés tant qu'aucun filtre de région ou de cohorte n'est appliqué
+            if (!StringUtils.hasText(region) && cohorteId == null) {
+                String maRegion = m.getLocalisation() != null ? m.getLocalisation().getRegion() : null;
+                if (maRegion != null)
+                    contacts.add(Contact.builder().type("SERVICE").service("REGIONAL").nom("Direction régionale · " + maRegion)
+                            .delaiReponse("Répond en ~2 h").build());
+                contacts.add(Contact.builder().type("SERVICE").service("NATIONAL").nom("Direction nationale du SNJ")
+                        .delaiReponse("Répond en ~24 h").build());
+                contacts.removeIf(c -> q != null && !sansAccents(c.getNom().toLowerCase()).contains(q));
+            }
+            contacts.addAll(membres(m, q, portee, region, cohorteId));
+            return contacts;
         }
-        return contacts.stream().filter(c -> q == null || (c.getNom() + " " + Objects.toString(c.getDetail(), "")).toLowerCase().contains(q)).toList();
+        userRepository.findAll().stream()
+                .filter(u -> u.isActif() && u.getRole() != RoleEnum.ROLE_MEMBRE && !u.getId().equals(moi.getId()))
+                .forEach(u -> contacts.add(Contact.builder().type("UTILISATEUR").userId(u.getId()).nom(nom(u))
+                        .detail(libelleRole(u)).enLigne(enLigne(u.getId())).build()));
+        return contacts.stream().filter(c -> q == null || sansAccents((c.getNom() + " " + Objects.toString(c.getDetail(), "")).toLowerCase()).contains(q)).toList();
+    }
+
+    /**
+     * Membres joignables par un membre : par défaut ceux de sa cohorte ; avec une recherche ou un filtre, tous les membres.
+     * Les membres de sa cohorte sont listés en premier.
+     */
+    private List<Contact> membres(Membre moi, String q, String portee, String region, Long cohorteId) {
+        boolean filtre = q != null || StringUtils.hasText(region) || cohorteId != null;
+        boolean maCohorte = "COHORTE".equalsIgnoreCase(portee) || (!StringUtils.hasText(portee) && !filtre);
+        Long cohorteMoi = moi.getCohorte().getId();
+        return membreRepository.findAll().stream()
+                .filter(x -> x.getUserId() != null && !x.getId().equals(moi.getId()) && x.getStatut() != StatutMembreEnum.ARCHIVE)
+                .filter(x -> !maCohorte || x.getCohorte().getId().equals(cohorteMoi))
+                .filter(x -> cohorteId == null || x.getCohorte().getId().equals(cohorteId))
+                .filter(x -> !StringUtils.hasText(region) || (x.getLocalisation() != null && region.equalsIgnoreCase(x.getLocalisation().getRegion())))
+                .filter(x -> q == null || correspond(x, q))
+                .sorted(Comparator.comparing((Membre x) -> !x.getCohorte().getId().equals(cohorteMoi))
+                        .thenComparing(x -> (x.getPrenom() + " " + x.getNom()).toLowerCase()))
+                .limit(MAX_MEMBRES)
+                .map(x -> contactMembre(x, cohorteMoi))
+                .toList();
+    }
+
+    /** Recherche sur le nom (dans les deux ordres), le matricule, la localisation ou le numéro de téléphone. */
+    private static boolean correspond(Membre x, String q) {
+        Localisation l = x.getLocalisation();
+        String texte = String.join(" ", x.getPrenom(), x.getNom(), x.getPrenom(), Objects.toString(x.getIdentifiantSnj(), ""),
+                l == null ? "" : String.join(" ", Objects.toString(l.getRegion(), ""), Objects.toString(l.getCercle(), ""),
+                        Objects.toString(l.getCommune(), ""), Objects.toString(l.getQuartier(), "")));
+        if (sansAccents(texte.toLowerCase()).contains(q)) return true;
+        String chiffres = q.replaceAll("[\\s+.-]", "");
+        return chiffres.matches("\\d{4,}") && x.getNumeroTelephone() != null && x.getNumeroTelephone().replaceAll("\\D", "").contains(chiffres);
+    }
+
+    private Contact contactMembre(Membre x, Long cohorteMoi) {
+        Localisation l = x.getLocalisation();
+        String regionMembre = l != null ? l.getRegion() : null;
+        String lieu = l == null ? null : String.join(", ", new LinkedHashSet<>(Stream.of(l.getCommune(), l.getCercle(), l.getRegion())
+                .filter(StringUtils::hasText).toList()));
+        String profession = x.getSituationProfessionnelle() != null ? x.getSituationProfessionnelle().getProfession() : null;
+        return Contact.builder().type("MEMBRE").userId(x.getUserId()).membreId(x.getId())
+                .nom(x.getPrenom() + " " + x.getNom())
+                .detail(String.join(" · ", Stream.of(x.getIdentifiantSnj(), profession, regionMembre).filter(StringUtils::hasText).toList()))
+                .identifiantSnj(x.getIdentifiantSnj()).cohorteNom(x.getCohorte().getNom()).memeCohorte(x.getCohorte().getId().equals(cohorteMoi))
+                .region(regionMembre).localisation(StringUtils.hasText(lieu) ? lieu : null)
+                .enLigne(enLigne(x.getUserId())).build();
+    }
+
+    private static String sansAccents(String s) {
+        return java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
     }
 
     // =====================================================================

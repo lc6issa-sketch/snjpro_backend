@@ -9,4 +9,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ImportSessionRepository extends JpaRepository<ImportSession, Long> {
     Page<ImportSession> findAllByOrderByDateCreationDesc(Pageable pageable);
+    Page<ImportSession> findByCohorteIdOrderByDateCreationDesc(Long cohorteId, Pageable pageable);
 }

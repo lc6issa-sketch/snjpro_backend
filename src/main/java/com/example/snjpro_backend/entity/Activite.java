@@ -42,6 +42,10 @@ public class Activite {
     @Column(length = 100)
     private String region;
 
+    /** Activité réservée à une cohorte (créée par son responsable) : seuls ses membres peuvent pointer. */
+    @Column(name = "cohorte_id")
+    private Long cohorteId;
+
     /** Mobilisation liée : ses volontaires disponibles constituent la liste des inscrits. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mobilisation_id")

@@ -9,7 +9,12 @@ import com.example.snjpro_backend.enumeration.Enumerations.StatutCandidature;
 import com.example.snjpro_backend.enumeration.Enumerations.StatutMobilisation;
 import com.example.snjpro_backend.enumeration.StatutMembreEnum;
 import com.example.snjpro_backend.repository.MembreRepository;
+import com.example.snjpro_backend.repository.MembreCompetenceRepository;
+import com.example.snjpro_backend.repository.ParcoursSNJRepository;
 import com.example.snjpro_backend.repository.ParticipationMobilisationRepository;
+import com.example.snjpro_backend.repository.UserRepository;
+import com.example.snjpro_backend.dto.DocumentDTOs.Fichier;
+import org.springframework.security.access.AccessDeniedException;
 import com.example.snjpro_backend.security.PerimetreService;
 import com.example.snjpro_backend.serviceInterface.*;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -48,6 +54,9 @@ public class EspaceMembreServiceImpl implements EspaceMembreServiceInterface {
     private final OpportuniteServiceInterface opportuniteService;
     private final GenerateurFichiers generateur;
     private final ParticipationMobilisationRepository participationRepository;
+    private final MembreCompetenceRepository competenceRepository;
+    private final ParcoursSNJRepository parcoursRepository;
+    private final UserRepository userRepository;
 
     @Value("${app.jwt.secret}")
     private String secret;
@@ -174,7 +183,7 @@ public class EspaceMembreServiceImpl implements EspaceMembreServiceInterface {
         if (m.getLocalisation() != null)
             identite.add(new String[]{"Adresse", joindre(m.getLocalisation().getQuartier(), m.getLocalisation().getCommune(),
                     m.getLocalisation().getCercle(), m.getLocalisation().getRegion())});
-        if (m.getDernierDiplome() != null) identite.add(new String[]{"Dernier diplôme", m.getDernierDiplome()});
+        if (m.getDiplomes() != null && !m.getDiplomes().isEmpty()) identite.add(new String[]{"Diplômes", String.join(", ", m.getDiplomes())});
         sections.add(new GenerateurFichiers.Section("Informations personnelles", identite));
 
         SituationProfessionnelleDTO sp = m.getSituationProfessionnelle();
@@ -208,6 +217,92 @@ public class EspaceMembreServiceImpl implements EspaceMembreServiceInterface {
         }
         return generateur.document(m.getPrenom() + " " + m.getNom(), cv.getTitre(), sections,
                 "CV généré le " + LocalDate.now().format(JJ_MM_AAAA) + " depuis SNJPro.");
+    }
+
+    @Override
+    public ProfilScanne profilScanne(String qrContenu) {
+        String contenu = qrContenu == null ? "" : qrContenu.trim();
+        if (contenu.startsWith("SNJPRO:ACT:"))
+            return ProfilScanne.builder().valide(false).message("Ce QR code est celui d'une activité : utilisez « Scanner une présence ».").build();
+        if (!contenu.startsWith(PREFIXE_QR))
+            return ProfilScanne.builder().valide(false).message("QR code non reconnu : ce n'est pas une carte SNJPro.").build();
+        String[] parties = contenu.substring(PREFIXE_QR.length()).split(":");
+        if (parties.length != 2 || !signatureValide(parties[0], parties[1]))
+            return ProfilScanne.builder().valide(false).message("Signature invalide : carte falsifiée ou altérée.").build();
+        Membre m = membreRepository.findByIdentifiantSnj(parties[0]).orElse(null);
+        if (m == null)
+            return ProfilScanne.builder().valide(false).message("Aucun membre ne porte cet identifiant.").build();
+        if (m.getStatut() == StatutMembreEnum.ARCHIVE)
+            return ProfilScanne.builder().valide(false).identifiantSnj(m.getIdentifiantSnj())
+                    .message("Carte authentique, mais ce membre n'est plus actif au SNJ.").build();
+
+        Long moiUserId = perimetre.utilisateurCourant().getId();
+        Long maCohorte = membreRepository.findByUserId(moiUserId).map(x -> x.getCohorte() == null ? null : x.getCohorte().getId()).orElse(null);
+        var sp = m.getSituationProfessionnelle();
+        List<CompetenceDTO> competences = competenceRepository.findByMembreId(m.getId()).stream().map(c -> {
+            CompetenceDTO d = new CompetenceDTO();
+            d.setId(c.getId());
+            d.setIntitule(c.getIntitule());
+            d.setCategorie(c.getCategorie());
+            d.setNiveau(c.getNiveau());
+            return d;
+        }).toList();
+        // Les sanctions et les descriptions internes ne sont jamais montrées aux autres membres.
+        List<ParcoursSNJDTO> parcours = parcoursRepository.findByMembreIdOrderByDateDebutDesc(m.getId()).stream()
+                .filter(p -> !"SANCTION".equalsIgnoreCase(p.getType()))
+                .map(p -> {
+                    ParcoursSNJDTO d = new ParcoursSNJDTO();
+                    d.setId(p.getId());
+                    d.setIntitule(p.getIntitule());
+                    d.setType(p.getType());
+                    d.setDateDebut(p.getDateDebut());
+                    d.setDateFin(p.getDateFin());
+                    d.setLieu(p.getLieu());
+                    return d;
+                }).toList();
+        return ProfilScanne.builder()
+                .valide(true)
+                .message("Carte authentique.")
+                .membreId(m.getId())
+                .identifiantSnj(m.getIdentifiantSnj())
+                .prenom(m.getPrenom())
+                .nom(m.getNom())
+                .photo(StringUtils.hasText(m.getPhotoUrl()) && !m.getPhotoUrl().startsWith("http"))
+                .signature(parties[1])
+                .cohorte(m.getCohorte() == null ? null : m.getCohorte().getNom())
+                .memeCohorte(m.getCohorte() != null && m.getCohorte().getId().equals(maCohorte))
+                .compagnie(m.getCompagnie())
+                .section(m.getSection())
+                .dateIncorporation(m.getDateIncorporation())
+                .statut(m.getStatut() == null ? null : m.getStatut().name())
+                .region(m.getLocalisation() == null ? null : m.getLocalisation().getRegion())
+                .profession(sp == null ? null : sp.getProfession())
+                .secteurActivite(sp == null ? null : sp.getSecteurActivite())
+                .competences(competences)
+                .parcours(parcours)
+                .mobilisations(participationRepository.findByMembreIdOrderByDateSollicitationDesc(m.getId()).stream()
+                        .filter(p -> p.getReponse() == ReponseMobilisation.DISPONIBLE).count())
+                .contactable(m.getUserId() != null && !m.getUserId().equals(moiUserId))
+                .enLigne(m.getUserId() != null && userRepository.findById(m.getUserId())
+                        .map(u -> u.getDerniereConnexion() != null && u.getDerniereConnexion().isAfter(LocalDateTime.now().minusMinutes(30)))
+                        .orElse(false))
+                .moi(moiUserId.equals(m.getUserId()))
+                .build();
+    }
+
+    @Override
+    public Fichier photoScannee(String identifiantSnj, String signature) {
+        if (!signatureValide(identifiantSnj, signature))
+            throw new AccessDeniedException("Signature de carte invalide.");
+        Membre m = membreRepository.findByIdentifiantSnj(identifiantSnj)
+                .filter(x -> x.getStatut() != StatutMembreEnum.ARCHIVE)
+                .orElseThrow(() -> new EntityNotFoundException("Membre non trouvé."));
+        return membreService.photo(m.getId());
+    }
+
+    private boolean signatureValide(String identifiant, String signature) {
+        return identifiant != null && signature != null && MessageDigest.isEqual(
+                signature(identifiant).getBytes(StandardCharsets.UTF_8), signature.getBytes(StandardCharsets.UTF_8));
     }
 
     private Membre trouver(Long id) {

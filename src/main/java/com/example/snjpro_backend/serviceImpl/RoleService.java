@@ -109,14 +109,15 @@ public class RoleService {
             case ROLE_RESPONSABLE_REGIONAL -> switch (module) {
                 case "MEMBRES" -> new boolean[]{t, f, t, f};
                 case "MOBILISATION" -> new boolean[]{t, t, t, t};
-                case "NOTIFICATIONS", "DEMANDES" -> new boolean[]{t, t, t, f};
+                case "NOTIFICATIONS", "DEMANDES", "ACTUALITES" -> new boolean[]{t, t, t, f};
                 case "ACTIVITES", "SOUVENIRS" -> new boolean[]{t, t, t, f};
                 case "COHORTES", "COMPETENCES", "STATISTIQUES", "DOCUMENTS" -> new boolean[]{t, f, f, f};
                 default -> new boolean[]{f, f, f, f};
             };
             case ROLE_RESPONSABLE_COHORTE -> switch (module) {
                 case "MEMBRES" -> new boolean[]{t, t, t, f};
-                case "ACTIVITES", "NOTIFICATIONS", "DEMANDES", "MOBILISATION", "SOUVENIRS" -> new boolean[]{t, t, t, f};
+                case "IMPORT" -> new boolean[]{t, t, f, f}; // import limité à sa cohorte
+                case "ACTIVITES", "NOTIFICATIONS", "DEMANDES", "MOBILISATION", "SOUVENIRS", "ACTUALITES" -> new boolean[]{t, t, t, f};
                 case "COHORTES", "COMPETENCES", "STATISTIQUES", "DOCUMENTS" -> new boolean[]{t, f, f, f};
                 default -> new boolean[]{f, f, f, f};
             };
@@ -142,8 +143,8 @@ public class RoleService {
             case ROLE_ADMIN_SYSTEME -> "Gère les comptes, les rôles et les paramètres de la plateforme.";
             case ROLE_ADMIN_SNJ -> "Gère les membres, cohortes, imports et communications.";
             case ROLE_DIRECTION -> "Consulte le tableau de bord, les statistiques et les rapports.";
-            case ROLE_RESPONSABLE_REGIONAL -> "Gère les membres de sa région et lance des mobilisations.";
-            case ROLE_RESPONSABLE_COHORTE -> "Suit les membres de sa cohorte et enregistre les présences.";
+            case ROLE_RESPONSABLE_REGIONAL -> "Gère les membres de sa région ; ses mobilisations, actualités et notifications ne concernent que sa région.";
+            case ROLE_RESPONSABLE_COHORTE -> "Suit les membres de sa cohorte ; ses mobilisations, actualités et notifications ne concernent que sa cohorte.";
             case ROLE_MEMBRE -> "Consulte son profil et répond aux sollicitations depuis l'application mobile.";
             case ROLE_PARTENAIRE -> "Publie des opportunités d'emploi, de stage ou de formation.";
         };
