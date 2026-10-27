@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -76,6 +77,8 @@ public final class StatistiqueDTOs {
         private long profilsAvecSituation;
         /** Taux moyen de complétude des profils par année d'incorporation. */
         private Map<Integer, Integer> completudeParAnnee;
+        /** Part des membres ayant déclaré au moins une compétence, par année d'incorporation. */
+        private Map<Integer, Integer> competencesParAnnee;
         private List<Libelle> repartitionSexe;
         private List<Libelle> parCohorte;
     }
@@ -113,6 +116,8 @@ public final class StatistiqueDTOs {
         private List<String> sections = List.of("IDENTITE", "CONTACT", "COHORTE", "LOCALISATION", "SITUATION");
         private boolean masquerDonneesSensibles = true;
         private MembreFilterDTO filtres = new MembreFilterDTO();
+        /** Membres cochés dans la liste : s'il y en a, seuls ceux-là sont exportés (toujours dans le périmètre). */
+        private List<Long> ids = new ArrayList<>();
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

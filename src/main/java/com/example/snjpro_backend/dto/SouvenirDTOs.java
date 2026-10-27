@@ -48,6 +48,8 @@ public final class SouvenirDTOs {
         private String nomFichier;
         private String typeMime;
         private long taille;
+        /** Vidéo ou son : une image de couverture est disponible (GET …/medias/{id}/couverture). */
+        private boolean couverture;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

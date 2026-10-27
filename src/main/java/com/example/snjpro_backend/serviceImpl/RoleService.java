@@ -116,6 +116,7 @@ public class RoleService {
             };
             case ROLE_RESPONSABLE_COHORTE -> switch (module) {
                 case "MEMBRES" -> new boolean[]{t, t, t, f};
+                case "IMPORT" -> new boolean[]{t, t, f, f}; // import limité à sa cohorte
                 case "ACTIVITES", "NOTIFICATIONS", "DEMANDES", "MOBILISATION", "SOUVENIRS", "ACTUALITES" -> new boolean[]{t, t, t, f};
                 case "COHORTES", "COMPETENCES", "STATISTIQUES", "DOCUMENTS" -> new boolean[]{t, f, f, f};
                 default -> new boolean[]{f, f, f, f};

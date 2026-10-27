@@ -54,6 +54,9 @@ public class SouvenirServiceImpl implements SouvenirServiceInterface {
     private static final String ENTITE = "SOUVENIR";
     private static final String DOSSIER = "souvenirs";
     private static final int MAX_MEDIAS = 10;
+    /** Images acceptées comme couverture d'une vidéo ou d'un son. */
+    private static final Set<String> COUVERTURES = Set.of("jpg", "jpeg", "png", "webp");
+    private static final long COUVERTURE_MAX = 5L * 1024 * 1024;
     private static final Set<String> PHOTOS = Set.of("jpg", "jpeg", "png", "gif", "webp", "heic");
     private static final Set<String> VIDEOS = Set.of("mp4", "m4v", "webm", "mov", "3gp");
     private static final Set<String> AUDIOS = Set.of("mp3", "wav", "ogg", "oga", "m4a", "aac", "opus");
@@ -158,8 +161,35 @@ public class SouvenirServiceImpl implements SouvenirServiceInterface {
         if (s.getMedias().size() == 1)
             throw new ConflitException("Un souvenir doit garder au moins un fichier : supprimez plutôt le souvenir.");
         s.getMedias().remove(m);
-        stockage.supprimer(m.getChemin());
+        supprimerFichiers(m);
         return toResume(souvenirRepository.save(s));
+    }
+
+    @Override
+    public Resume definirCouverture(Long id, Long mediaId, MultipartFile image) {
+        Souvenir s = trouverGerable(id);
+        poserCouverture(media(s, mediaId), image);
+        historiqueService.enregistrer("MODIFICATION", ENTITE, id, s.getTitre() + " · couverture");
+        return toResume(souvenirRepository.save(s));
+    }
+
+    @Override
+    public Resume supprimerCouverture(Long id, Long mediaId) {
+        Souvenir s = trouverGerable(id);
+        SouvenirMedia m = media(s, mediaId);
+        if (m.getCouverture() != null) stockage.supprimer(m.getCouverture());
+        m.setCouverture(null);
+        m.setCouvertureTypeMime(null);
+        return toResume(souvenirRepository.save(s));
+    }
+
+    @Override @Transactional(readOnly = true)
+    public Fichier couverture(Long mediaId) {
+        SouvenirMedia m = mediaRepository.findById(mediaId)
+                .orElseThrow(() -> new EntityNotFoundException("Fichier non trouvé : " + mediaId));
+        verifierLecture(m.getSouvenir());
+        if (m.getCouverture() == null) throw new EntityNotFoundException("Aucune image de couverture pour ce fichier.");
+        return new Fichier(stockage.lire(m.getCouverture()), "couverture-" + mediaId, m.getCouvertureTypeMime());
     }
 
     @Override
@@ -191,7 +221,7 @@ public class SouvenirServiceImpl implements SouvenirServiceInterface {
     @Override
     public void supprimer(Long id) {
         Souvenir s = trouverGerable(id);
-        s.getMedias().forEach(m -> stockage.supprimer(m.getChemin()));
+        s.getMedias().forEach(this::supprimerFichiers);
         souvenirRepository.delete(s);
         historiqueService.enregistrer("SUPPRESSION", ENTITE, id, s.getTitre());
     }
@@ -243,8 +273,20 @@ public class SouvenirServiceImpl implements SouvenirServiceInterface {
         Membre m = membreCourant();
         if (s.getAuteurMembre() == null || !s.getAuteurMembre().getId().equals(m.getId()))
             throw new AccessDeniedException("Vous ne pouvez supprimer que vos propres envois.");
-        s.getMedias().forEach(x -> stockage.supprimer(x.getChemin()));
+        s.getMedias().forEach(this::supprimerFichiers);
         souvenirRepository.delete(s);
+    }
+
+    @Override
+    public Resume definirCouvertureMonEnvoi(Long id, Long mediaId, MultipartFile image) {
+        Souvenir s = souvenirRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("Souvenir non trouvé : " + id));
+        Membre m = membreCourant();
+        if (s.getAuteurMembre() == null || !s.getAuteurMembre().getId().equals(m.getId()))
+            throw new AccessDeniedException("Vous ne pouvez modifier que vos propres envois.");
+        if (s.getStatut() == StatutSouvenir.PUBLIE)
+            throw new ConflitException("Ce souvenir est déjà publié : demandez à un gestionnaire de changer la couverture.");
+        poserCouverture(media(s, mediaId), image);
+        return toResume(souvenirRepository.save(s));
     }
 
     // =====================================================================
@@ -358,6 +400,33 @@ public class SouvenirServiceImpl implements SouvenirServiceInterface {
         }
     }
 
+    private static SouvenirMedia media(Souvenir s, Long mediaId) {
+        return s.getMedias().stream().filter(x -> x.getId().equals(mediaId)).findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("Fichier non trouvé : " + mediaId));
+    }
+
+    /** Enregistre l'image de couverture d'une vidéo ou d'un son ; l'ancienne couverture est supprimée. */
+    private void poserCouverture(SouvenirMedia m, MultipartFile image) {
+        if (m.getType() == TypeMedia.PHOTO)
+            throw new IllegalArgumentException("Une photo n'a pas besoin d'image de couverture.");
+        if (image == null || image.isEmpty())
+            throw new IllegalArgumentException("Choisissez une image de couverture.");
+        String ext = StockageFichierService.extension(image.getOriginalFilename());
+        if (!COUVERTURES.contains(ext))
+            throw new IllegalArgumentException("La couverture doit être une image JPG, PNG ou WEBP.");
+        if (image.getSize() > COUVERTURE_MAX)
+            throw new IllegalArgumentException("L'image de couverture ne doit pas dépasser 5 Mo.");
+        String chemin = stockage.enregistrer(image, DOSSIER, COUVERTURES);
+        if (m.getCouverture() != null) stockage.supprimer(m.getCouverture());
+        m.setCouverture(chemin);
+        m.setCouvertureTypeMime(StockageFichierService.typeMime(image.getOriginalFilename()));
+    }
+
+    private void supprimerFichiers(SouvenirMedia m) {
+        stockage.supprimer(m.getChemin());
+        if (m.getCouverture() != null) stockage.supprimer(m.getCouverture());
+    }
+
     private static TypeMedia typeDe(String extension) {
         if (VIDEOS.contains(extension)) return TypeMedia.VIDEO;
         if (AUDIOS.contains(extension)) return TypeMedia.AUDIO;
@@ -390,7 +459,8 @@ public class SouvenirServiceImpl implements SouvenirServiceInterface {
 
     private Resume toResume(Souvenir s) {
         List<Media> medias = s.getMedias().stream().map(m -> Media.builder().id(m.getId()).type(m.getType())
-                .nomFichier(m.getNomFichier()).typeMime(m.getTypeMime()).taille(m.getTaille()).build()).toList();
+                .nomFichier(m.getNomFichier()).typeMime(m.getTypeMime()).taille(m.getTaille())
+                .couverture(m.getCouverture() != null).build()).toList();
         return Resume.builder()
                 .id(s.getId()).titre(s.getTitre()).legende(s.getLegende())
                 .cohorteId(s.getCohorte().getId()).cohorteNom(s.getCohorte().getNom())

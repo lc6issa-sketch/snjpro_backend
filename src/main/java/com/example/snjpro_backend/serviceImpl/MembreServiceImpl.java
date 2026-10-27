@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -35,6 +36,8 @@ import java.util.stream.Stream;
 @Transactional
 public class MembreServiceImpl implements MembreServiceInterface {
     private static final String ENTITE = "MEMBRE";
+    /** Âge minimal d'un membre à l'enregistrement. */
+    public static final int AGE_MINIMUM = 18;
 
     private final MembreRepository membreRepository;
     private final CohorteRepository cohorteRepository;
@@ -51,6 +54,8 @@ public class MembreServiceImpl implements MembreServiceInterface {
 
     @Override
     public MembreResponseDTO ajouterMembre(MembreDTO dto, String createdBy, boolean forcer) {
+        if (dto.getDateNaissance() != null && dto.getDateNaissance().isAfter(LocalDate.now().minusYears(AGE_MINIMUM)))
+            throw new IllegalArgumentException("Le membre doit avoir au moins " + AGE_MINIMUM + " ans.");
         Cohorte cohorte = trouverCohorte(dto.getCohorteId());
         if (cohorte.getStatut() == StatutCohorteEnum.ARCHIVEE)
             throw new ConflitException("Impossible d'ajouter un membre à une cohorte archivée.");

@@ -74,6 +74,9 @@ public class SecurityConfig {
                 // Logo et charte graphique : nécessaires avant la connexion
                 .requestMatchers(HttpMethod.GET, "/api/apparence").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                // Assistant d'import : le responsable de cohorte importe dans sa cohorte (contrôlé dans ImportAssistantServiceImpl)
+                .requestMatchers("/api/import/sessions", "/api/import/sessions/**")
+                    .hasAnyRole("ADMIN_SYSTEME", "ADMIN_SNJ", "RESPONSABLE_COHORTE")
                 .requestMatchers("/api/utilisateurs/**", "/api/historique/**", "/api/import/**")
                     .hasAnyRole("ADMIN_SYSTEME", "ADMIN_SNJ")
                 // Contrôle fin (périmètre, rôle par action) assuré par @PreAuthorize dans les contrôleurs

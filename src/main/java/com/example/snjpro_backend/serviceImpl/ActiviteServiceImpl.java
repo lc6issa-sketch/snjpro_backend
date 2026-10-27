@@ -159,7 +159,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
         historiqueService.enregistrer("SUPPRESSION_PRESENCE", ENTITE, id, p.getMembre().getIdentifiantSnj());
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override @Transactional // écrit dans l'historique : pas de transaction en lecture seule
     public byte[] exporterPresences(Long id, FormatFichier format) {
         Activite a = trouverGerable(id);
         List<List<String>> lignes = presenceRepository.findByActiviteIdOrderByDateHeureDesc(id).stream()

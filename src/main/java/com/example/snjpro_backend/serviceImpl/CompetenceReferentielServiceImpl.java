@@ -3,7 +3,9 @@ package com.example.snjpro_backend.serviceImpl;
 import com.example.snjpro_backend.dto.CompetenceReferentielDTOs.*;
 import com.example.snjpro_backend.entity.CompetenceReferentiel;
 import com.example.snjpro_backend.entity.MembreCompetence;
+import com.example.snjpro_backend.entity.User;
 import com.example.snjpro_backend.enumeration.NiveauCompetenceEnum;
+import com.example.snjpro_backend.enumeration.RoleEnum;
 import com.example.snjpro_backend.exception.ConflitException;
 import com.example.snjpro_backend.repository.CompetenceReferentielRepository;
 import com.example.snjpro_backend.repository.MembreCompetenceRepository;
@@ -12,6 +14,7 @@ import com.example.snjpro_backend.serviceInterface.CompetenceReferentielServiceI
 import com.example.snjpro_backend.serviceInterface.HistoriqueServiceInterface;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -32,15 +35,17 @@ public class CompetenceReferentielServiceImpl implements CompetenceReferentielSe
     private final HistoriqueServiceInterface historiqueService;
 
     @Override
-    public List<Competence> lister(String categorie, String recherche, String tri) {
+    public List<Competence> lister(String categorie, String recherche, String tri, boolean toutes) {
         synchroniser();
-        Map<String, List<MembreCompetence>> parNom = indexMembres();
+        Long cohorteId = cohorteRestreinte(toutes);
+        Map<String, List<MembreCompetence>> parNom = indexMembres(cohorteId);
         Comparator<Competence> ordre = switch (tri == null ? "MEMBRES" : tri.toUpperCase()) {
             case "NOM" -> Comparator.comparing(Competence::getNom, String.CASE_INSENSITIVE_ORDER);
             case "RECENTES" -> Comparator.comparing((Competence c) -> c.getAnneeAjout() == null ? 0 : c.getAnneeAjout()).reversed();
             default -> Comparator.comparingLong(Competence::getNombreMembres).reversed();
         };
         return referentielRepository.findAll().stream()
+                .filter(c -> cohorteId == null || parNom.containsKey(cle(c.getNom())))
                 .filter(c -> !StringUtils.hasText(categorie) || categorie.equalsIgnoreCase(categorieDe(c)))
                 .filter(c -> !StringUtils.hasText(recherche) || c.getNom().toLowerCase().contains(recherche.trim().toLowerCase()))
                 .map(c -> toDTO(c, parNom))
@@ -49,10 +54,12 @@ public class CompetenceReferentielServiceImpl implements CompetenceReferentielSe
     }
 
     @Override
-    public List<Categorie> categories() {
+    public List<Categorie> categories(boolean toutes) {
         synchroniser();
-        Map<String, List<MembreCompetence>> parNom = indexMembres();
+        Long cohorteId = cohorteRestreinte(toutes);
+        Map<String, List<MembreCompetence>> parNom = indexMembres(cohorteId);
         Map<String, List<CompetenceReferentiel>> groupes = referentielRepository.findAll().stream()
+                .filter(c -> cohorteId == null || parNom.containsKey(cle(c.getNom())))
                 .collect(Collectors.groupingBy(this::categorieDe, TreeMap::new, Collectors.toList()));
         return groupes.entrySet().stream()
                 .map(e -> Categorie.builder().nom(e.getKey()).nombreCompetences(e.getValue().size())
@@ -151,8 +158,25 @@ public class CompetenceReferentielServiceImpl implements CompetenceReferentielSe
     // Utilitaires
     // =====================================================================
 
-    private Map<String, List<MembreCompetence>> indexMembres() {
-        return membreCompetenceRepository.findAll().stream().collect(Collectors.groupingBy(mc -> cle(mc.getIntitule())));
+    private Map<String, List<MembreCompetence>> indexMembres() { return indexMembres(null); }
+
+    /** Compétences des membres, regroupées par intitulé ; cohorteId non nul : membres de cette cohorte seulement. */
+    private Map<String, List<MembreCompetence>> indexMembres(Long cohorteId) {
+        return membreCompetenceRepository.findAll().stream()
+                .filter(mc -> cohorteId == null || (mc.getMembre().getCohorte() != null && cohorteId.equals(mc.getMembre().getCohorte().getId())))
+                .collect(Collectors.groupingBy(mc -> cle(mc.getIntitule())));
+    }
+
+    /** Cohorte du responsable de cohorte connecté (vue par défaut), ou null : toutes les cohortes. */
+    private Long cohorteRestreinte(boolean toutes) {
+        if (toutes) return null;
+        User user;
+        try {
+            user = perimetre.utilisateurCourant();
+        } catch (AccessDeniedException e) {
+            return null; // tâche planifiée (rapport mensuel) : aucun utilisateur connecté
+        }
+        return user.getRole() == RoleEnum.ROLE_RESPONSABLE_COHORTE ? user.getCohorteId() : null;
     }
 
     private Competence toDTO(CompetenceReferentiel c, Map<String, List<MembreCompetence>> parNom) {

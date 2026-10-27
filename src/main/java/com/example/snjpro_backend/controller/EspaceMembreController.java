@@ -42,6 +42,21 @@ public class EspaceMembreController {
         return ResponseEntity.ok(service.verifierCarte(corps.get("qr")));
     }
 
+    @PostMapping("/api/cartes/scan")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Scanner la carte d'un membre : profil public (parcours, compétences) et possibilité de lui écrire")
+    public ResponseEntity<ProfilScanne> scannerCarte(@RequestBody java.util.Map<String, String> corps) {
+        return ResponseEntity.ok(service.profilScanne(corps.get("qr")));
+    }
+
+    @GetMapping("/api/cartes/{identifiantSnj}/{signature}/photo")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Photo du membre dont la carte a été scannée (la signature du QR sert de preuve)")
+    public ResponseEntity<byte[]> photoCarteScannee(@PathVariable String identifiantSnj, @PathVariable String signature) {
+        var f = service.photoScannee(identifiantSnj, signature);
+        return Telechargement.fichier(f.contenu(), f.nom(), f.typeMime(), true);
+    }
+
     @GetMapping("/api/membres/{id}/completude")
     @PreAuthorize(GESTIONNAIRES + " and @perimetre.peutAcceder(#id)")
     @Operation(summary = "Complétude du profil d'un membre et éléments manquants")

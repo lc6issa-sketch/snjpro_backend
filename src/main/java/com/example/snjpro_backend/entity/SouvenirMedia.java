@@ -36,4 +36,11 @@ public class SouvenirMedia {
 
     @Column(nullable = false)
     private int ordre;
+
+    /** Image de couverture d'une vidéo ou d'un son (chemin relatif dans le stockage), facultative. */
+    @Column(name = "couverture", length = 255)
+    private String couverture;
+
+    @Column(name = "couverture_type_mime", length = 100)
+    private String couvertureTypeMime;
 }

@@ -85,6 +85,20 @@ public class SouvenirController {
         return ResponseEntity.ok(service.supprimerMedia(id, mediaId));
     }
 
+    @PostMapping(value = "/api/souvenirs/{id}/medias/{mediaId}/couverture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize(GESTION)
+    @Operation(summary = "Image de couverture d'une vidéo ou d'un son (JPG, PNG ou WEBP, 5 Mo max)")
+    public ResponseEntity<Resume> definirCouverture(@PathVariable Long id, @PathVariable Long mediaId, @RequestParam("image") MultipartFile image) {
+        return ResponseEntity.ok(service.definirCouverture(id, mediaId, image));
+    }
+
+    @DeleteMapping("/api/souvenirs/{id}/medias/{mediaId}/couverture")
+    @PreAuthorize(GESTION)
+    @Operation(summary = "Retirer l'image de couverture d'une vidéo ou d'un son")
+    public ResponseEntity<Resume> supprimerCouverture(@PathVariable Long id, @PathVariable Long mediaId) {
+        return ResponseEntity.ok(service.supprimerCouverture(id, mediaId));
+    }
+
     @PostMapping("/api/souvenirs/{id}/valider")
     @PreAuthorize(GESTION)
     @Operation(summary = "Valider (publier) un souvenir envoyé par un membre")
@@ -113,6 +127,14 @@ public class SouvenirController {
     public ResponseEntity<byte[]> fichier(@PathVariable Long mediaId) {
         Fichier f = service.fichier(mediaId);
         return Telechargement.fichier(f.contenu(), f.nom(), f.typeMime() != null ? f.typeMime() : "application/octet-stream", true);
+    }
+
+    @GetMapping("/api/souvenirs/medias/{mediaId}/couverture")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Image de couverture d'une vidéo ou d'un son (404 si aucune)")
+    public ResponseEntity<byte[]> couverture(@PathVariable Long mediaId) {
+        Fichier f = service.couverture(mediaId);
+        return Telechargement.fichier(f.contenu(), f.nom(), f.typeMime() != null ? f.typeMime() : "image/jpeg", true);
     }
 
     // ---------------------------------------------------------------- Espace membre
@@ -145,5 +167,12 @@ public class SouvenirController {
     public ResponseEntity<Void> supprimerMonEnvoi(@PathVariable Long id) {
         service.supprimerMonEnvoi(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(value = "/api/mon-espace/souvenirs/{id}/medias/{mediaId}/couverture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('MEMBRE')")
+    @Operation(summary = "Image de couverture d'une vidéo ou d'un son de mon envoi (tant qu'il n'est pas publié)")
+    public ResponseEntity<Resume> definirCouvertureMonEnvoi(@PathVariable Long id, @PathVariable Long mediaId, @RequestParam("image") MultipartFile image) {
+        return ResponseEntity.ok(service.definirCouvertureMonEnvoi(id, mediaId, image));
     }
 }

@@ -204,7 +204,7 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
         return page.map(p -> toParticipant(p, competences));
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override @Transactional // écrit dans l'historique : pas de transaction en lecture seule
     public byte[] exporterParticipants(Long id, ReponseMobilisation reponse, FormatFichier format) {
         Mobilisation m = trouverGerable(id);
         List<String> competences = separer(m.getCritereCompetences());

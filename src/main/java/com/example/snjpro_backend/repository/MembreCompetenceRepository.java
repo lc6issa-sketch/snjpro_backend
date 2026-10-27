@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Set;
 
 @Repository
 public interface MembreCompetenceRepository extends JpaRepository<MembreCompetence, Long> {
@@ -14,4 +15,7 @@ public interface MembreCompetenceRepository extends JpaRepository<MembreCompeten
     void deleteByMembreId(Long membreId);
     @Query("SELECT DISTINCT c.intitule FROM MembreCompetence c ORDER BY c.intitule")
     List<String> findDistinctIntitules();
+    /** Membres ayant déclaré au moins une compétence (statistiques). */
+    @Query("SELECT DISTINCT c.membre.id FROM MembreCompetence c")
+    Set<Long> findMembresAvecCompetences();
 }

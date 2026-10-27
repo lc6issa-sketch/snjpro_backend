@@ -343,6 +343,8 @@ public class RechercheImportServiceImpl implements RechercheImportServiceInterfa
                 erreurs.add(erreur(numero, "dateNaissance", date, "Date invalide (formats acceptés : JJ/MM/AAAA ou AAAA-MM-JJ)"));
             else if (!lm.dateNaissance.isBefore(LocalDate.now()) || lm.dateNaissance.getYear() < 1900)
                 erreurs.add(erreur(numero, "dateNaissance", date, "Date de naissance incohérente"));
+            else if (lm.dateNaissance.isAfter(LocalDate.now().minusYears(MembreServiceImpl.AGE_MINIMUM)))
+                erreurs.add(erreur(numero, "dateNaissance", date, "Le membre doit avoir au moins " + MembreServiceImpl.AGE_MINIMUM + " ans"));
         }
 
         String tel = v.getOrDefault("telephone", "");

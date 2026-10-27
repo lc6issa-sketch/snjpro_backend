@@ -22,10 +22,16 @@ public interface SouvenirServiceInterface {
     Resume rejeter(Long id, String motif);
     void supprimer(Long id);
     Fichier fichier(Long mediaId);
+    /** Image de couverture d'une vidéo ou d'un son (remplace l'éventuelle couverture existante). */
+    Resume definirCouverture(Long id, Long mediaId, MultipartFile image);
+    Resume supprimerCouverture(Long id, Long mediaId);
+    Fichier couverture(Long mediaId);
 
     // Espace membre (application mobile)
     List<Resume> filMembre();
     List<Resume> mesEnvois();
     Resume soumettre(Edition dto, List<MultipartFile> fichiers);
     void supprimerMonEnvoi(Long id);
+    /** Couverture d'un de mes envois, tant qu'il n'est pas publié. */
+    Resume definirCouvertureMonEnvoi(Long id, Long mediaId, MultipartFile image);
 }

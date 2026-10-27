@@ -69,6 +69,38 @@ public final class EspaceMembreDTOs {
         private String statut;
     }
 
+    /** Profil visible après le scan de la carte d'un membre : pas de téléphone, e-mail, date de naissance ni sanction. */
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class ProfilScanne {
+        private boolean valide;
+        private String message;
+        private Long membreId;
+        private String identifiantSnj;
+        private String prenom;
+        private String nom;
+        @Schema(description = "Photo à charger sur /api/cartes/{identifiantSnj}/{signature}/photo")
+        private boolean photo;
+        private String signature;
+        private String cohorte;
+        private boolean memeCohorte;
+        private String compagnie;
+        private String section;
+        private LocalDate dateIncorporation;
+        private String statut;
+        private String region;
+        private String profession;
+        private String secteurActivite;
+        private List<CompetenceDTO> competences;
+        private List<ParcoursSNJDTO> parcours;
+        @Schema(description = "Mobilisations auxquelles le membre s'est déclaré disponible")
+        private long mobilisations;
+        @Schema(description = "Le membre a activé son compte : on peut lui écrire dans la messagerie")
+        private boolean contactable;
+        private boolean enLigne;
+        @Schema(description = "La carte scannée est celle de l'utilisateur connecté")
+        private boolean moi;
+    }
+
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class Cv {
         private MembreResponseDTO membre;

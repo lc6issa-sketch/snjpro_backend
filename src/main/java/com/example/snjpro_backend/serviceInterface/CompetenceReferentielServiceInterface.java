@@ -6,8 +6,9 @@ import java.util.List;
 
 public interface CompetenceReferentielServiceInterface {
     /** @param tri MEMBRES (plus représentées), NOM ou RECENTES */
-    List<Competence> lister(String categorie, String recherche, String tri);
-    List<Categorie> categories();
+    /** toutes = false : un responsable de cohorte ne voit que les compétences détenues par les membres de sa cohorte. */
+    List<Competence> lister(String categorie, String recherche, String tri, boolean toutes);
+    List<Categorie> categories(boolean toutes);
     Competence obtenir(Long id);
     Competence creer(Edition dto);
     Competence modifier(Long id, Edition dto);
