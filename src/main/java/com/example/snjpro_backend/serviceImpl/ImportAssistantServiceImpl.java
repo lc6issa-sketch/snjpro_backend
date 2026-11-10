@@ -318,7 +318,7 @@ public class ImportAssistantServiceImpl implements ImportAssistantServiceInterfa
             }
         }
         byte[] pdf = generateur.document("Rapport d'import", s.getNomFichier(), sections,
-                "Généré le " + LocalDateTime.now().format(f) + " par SNJPro.");
+                "Généré le " + LocalDateTime.now().format(f) + " par Si-SNJ.");
         return new Fichier(pdf, "rapport_import_" + s.getId() + ".pdf", "application/pdf");
     }
 

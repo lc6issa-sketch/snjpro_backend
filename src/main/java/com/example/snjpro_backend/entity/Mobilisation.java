@@ -97,6 +97,14 @@ public class Mobilisation {
     @Column(name = "critere_exclure_mobilises", nullable = false)
     private boolean critereExclureMobilises;
 
+    /** Compléter avec des membres d'autres cohortes si les cohortes choisies n'atteignent pas le nombre de volontaires. */
+    @Column(name = "critere_completer_autres_cohortes")
+    private Boolean critereCompleterAutresCohortes;
+
+    /** Cohortes utilisées pour le complément (ids séparés par des virgules) ; vide = toutes les autres cohortes. */
+    @Column(name = "critere_cohortes_complement", columnDefinition = "TEXT")
+    private String critereCohortesComplement;
+
     // ---- Envoi (étape 3)
     @Column(columnDefinition = "TEXT")
     private String message;

@@ -169,7 +169,7 @@ public class GenerateurFichiers {
     }
 
     private void entete(Document doc, String titre, String sousTitre) {
-        doc.add(new Paragraph("SNJPro — Service National des Jeunes du Mali",
+        doc.add(new Paragraph("Si-SNJ — Service National des Jeunes du Mali",
                 FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, VERT)));
         Paragraph p = new Paragraph(titre, FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16));
         p.setSpacingBefore(6);

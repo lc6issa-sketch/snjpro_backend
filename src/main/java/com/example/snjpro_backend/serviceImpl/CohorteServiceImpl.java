@@ -36,6 +36,7 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
         if (code != null && cohorteRepository.existsByCode(code))
             throw new ConflitException("Une cohorte avec le code '" + code + "' existe déjà.");
         verifierDates(dto);
+        verifierStatutSaisi(dto.getStatut());
         Cohorte cohorte = Cohorte.builder()
                 .nom(dto.getNom().trim())
                 .code(code)
@@ -61,6 +62,7 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
         if (code != null && !code.equals(cohorte.getCode()) && cohorteRepository.existsByCode(code))
             throw new ConflitException("Une cohorte avec le code '" + code + "' existe déjà.");
         verifierDates(dto);
+        if (dto.getStatut() != cohorte.getStatut()) verifierStatutSaisi(dto.getStatut());
         cohorte.setNom(dto.getNom().trim());
         cohorte.setCode(code);
         cohorte.setDescription(dto.getDescription());
@@ -70,7 +72,7 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
         cohorte.setDateFin(dto.getDateFin());
         if (dto.getStatut() != null) cohorte.setStatut(dto.getStatut());
         cohorte.setRegion(dto.getRegion());
-        cohorte.setResponsable(dto.getResponsable());
+        if (dto.getResponsable() != null) cohorte.setResponsable(dto.getResponsable());
         appliquerComplements(cohorte, dto);
         historiqueService.enregistrer("MODIFICATION", ENTITE, id, cohorte.getNom());
         return toDTO(cohorteRepository.save(cohorte));
@@ -104,7 +106,7 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
     @Override
     public CohorteDTO reactiverCohorte(Long id) {
         Cohorte cohorte = trouver(id);
-        cohorte.setStatut(StatutCohorteEnum.LIBEREE);
+        cohorte.setStatut(StatutCohorteEnum.EN_FONCTION);
         historiqueService.enregistrer("REACTIVATION", ENTITE, id, cohorte.getNom());
         return toDTO(cohorteRepository.save(cohorte));
     }
@@ -203,23 +205,33 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
         c.setRecruesInitiales(dto.getRecruesInitiales());
         c.setNombreCompagnies(dto.getNombreCompagnies());
         c.setNombreSections(dto.getNombreSections());
+        if (dto.getTypeCohorte() != null) c.setTypeCohorte(dto.getTypeCohorte());
+        c.setDirecteurCentre(texte(dto.getDirecteurCentre()));
+        c.setMajorCentre(texte(dto.getMajorCentre()));
+        // Ancien responsable (compte utilisateur) : le formulaire ne l'envoie plus, la valeur existante est conservée.
         if (dto.getResponsableId() != null) {
             com.example.snjpro_backend.entity.User u = userRepository.findById(dto.getResponsableId())
                     .orElseThrow(() -> new EntityNotFoundException("Utilisateur non trouvé : " + dto.getResponsableId()));
             c.setResponsableId(u.getId());
             c.setResponsable(((u.getPrenom() == null ? "" : u.getPrenom()) + " " + (u.getNom() == null ? "" : u.getNom())).trim());
-        } else {
-            c.setResponsableId(null);
         }
     }
 
-    private static String libelle(StatutCohorteEnum s) {
+    private static String texte(String s) {
+        return StringUtils.hasText(s) ? s.trim() : null;
+    }
+
+    /** Refuse ARCHIVEE dans les formulaires : l'archivage passe par l'action dédiée. */
+    private static void verifierStatutSaisi(StatutCohorteEnum s) {
+        if (s == StatutCohorteEnum.ARCHIVEE)
+            throw new IllegalArgumentException("Utilisez l'action « Archiver » pour archiver une cohorte.");
+    }
+
+    static String libelle(StatutCohorteEnum s) {
         return switch (s) {
             case EN_FORMATION -> "En formation";
-            case EN_RESERVE -> "En réserve";
-            case LIBEREE -> "Libérée";
-            case ACTIVE -> "Active";
-            case TERMINEE -> "Terminée";
+            case INCORPOREE -> "Incorporée";
+            case EN_FONCTION -> "En fonction";
             case ARCHIVEE -> "Archivée";
         };
     }
@@ -259,6 +271,9 @@ public class CohorteServiceImpl implements CohorteServiceInterface {
         dto.setRecruesInitiales(cohorte.getRecruesInitiales());
         dto.setNombreCompagnies(cohorte.getNombreCompagnies());
         dto.setNombreSections(cohorte.getNombreSections());
+        dto.setTypeCohorte(cohorte.getTypeCohorte());
+        dto.setDirecteurCentre(cohorte.getDirecteurCentre());
+        dto.setMajorCentre(cohorte.getMajorCentre());
         dto.setResponsableId(cohorte.getResponsableId());
         dto.setResponsableNom(cohorte.getResponsable());
         java.util.List<com.example.snjpro_backend.entity.Membre> membres = cohorte.getMembres();

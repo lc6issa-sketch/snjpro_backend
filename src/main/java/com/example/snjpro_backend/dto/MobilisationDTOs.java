@@ -60,6 +60,10 @@ public final class MobilisationDTOs {
         private Integer ageMax;
         private boolean telephoneVerifieUniquement;
         private boolean exclureDejaMobilises;
+        @Schema(description = "Si les cohortes choisies n'ont pas assez de membres pour le nombre de volontaires, compléter avec d'autres cohortes")
+        private boolean completerAvecAutresCohortes;
+        @Schema(description = "Cohortes de complément ; vide = toutes les autres cohortes")
+        private List<Long> cohortesComplement = new ArrayList<>();
     }
 
     /** Étape 3 : message et envoi. */
@@ -156,6 +160,8 @@ public final class MobilisationDTOs {
         private String cohorte;
         private List<String> competencesCorrespondantes;
         private boolean telephoneVerifie;
+        /** Membre ajouté depuis une autre cohorte pour atteindre le nombre de volontaires. */
+        private boolean complement;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
@@ -166,6 +172,16 @@ public final class MobilisationDTOs {
         private int pourcentageTelephoneVerifie;
         private int estimationSms;
         private List<MembreSelectionne> membres;
+        /** Nombre de volontaires recherchés (null si non précisé). */
+        private Integer objectif;
+        /** Membres trouvés dans les cohortes choisies. */
+        private int totalCohortesChoisies;
+        /** Places manquantes dans les cohortes choisies (objectif - totalCohortesChoisies, minimum 0). */
+        private int manque;
+        /** Membres d'autres cohortes qui répondent aux autres critères (complément possible). */
+        private int complementDisponible;
+        /** Membres d'autres cohortes réellement ajoutés à la sélection. */
+        private int complementRetenu;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

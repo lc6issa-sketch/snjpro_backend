@@ -89,9 +89,9 @@ public class DonneesTest implements CommandLineRunner {
         log.info("Insertion du jeu de données de test…");
 
         // ------------------------------------------------------------ Cohortes
-        Cohorte c1 = cohorte("Cohorte 2022 — N°23", "C2022", 23, 2022, 2023, StatutCohorteEnum.LIBEREE, "Centre d'instruction de Ségou", "Ségou");
-        Cohorte c2 = cohorte("Cohorte 2023 — N°24", "C2023", 24, 2023, 2024, StatutCohorteEnum.EN_RESERVE, "Centre d'instruction de Kati", "Koulikoro");
-        Cohorte c3 = cohorte("Cohorte 2024 — N°25", "C2024", 25, 2024, 2025, StatutCohorteEnum.LIBEREE, "Centre d'instruction de Sikasso", "Sikasso");
+        Cohorte c1 = cohorte("Cohorte 2022 — N°23", "C2022", 23, 2022, 2023, StatutCohorteEnum.EN_FONCTION, "Centre d'instruction de Ségou", "Ségou");
+        Cohorte c2 = cohorte("Cohorte 2023 — N°24", "C2023", 24, 2023, 2024, StatutCohorteEnum.INCORPOREE, "Centre d'instruction de Kati", "Koulikoro");
+        Cohorte c3 = cohorte("Cohorte 2024 — N°25", "C2024", 25, 2024, 2025, StatutCohorteEnum.EN_FONCTION, "Centre d'instruction de Sikasso", "Sikasso");
         Cohorte c4 = cohorte("Cohorte 2025 — N°26", "C2025", 26, 2025, 2026, StatutCohorteEnum.EN_FORMATION, "Centre d'instruction de Kati", "Koulikoro");
         Cohorte c0 = cohorte("Cohorte 2019 — N°20", "C2019", 20, 2019, 2020, StatutCohorteEnum.ARCHIVEE, "Centre d'instruction de Koulikoro", "Koulikoro");
         List<Cohorte> cohortes = List.of(c1, c2, c3, c4, c0);
@@ -176,7 +176,7 @@ public class DonneesTest implements CommandLineRunner {
         actualite("Cérémonie de libération Cohorte 2024", "Programme de la cérémonie", CategorieActualite.ANNONCE, StatutActualite.PROGRAMMEE, false, 7);
 
         // ------------------------------------------------------------ Notifications
-        notification("Bienvenue sur SNJPro", "Votre espace membre est disponible. Complétez votre profil.", TypeNotification.INFORMATION, membres, 20);
+        notification("Bienvenue sur Si-SNJ", "Votre espace membre est disponible. Complétez votre profil.", TypeNotification.INFORMATION, membres, 20);
         notification("Mobilisation urgente — Ségou", "Merci de confirmer votre disponibilité avant demain 18h.", TypeNotification.URGENT, membres.subList(0, 25), 5);
         notification("Nouvelle actualité publiée", "Consultez les nouvelles offres d'emploi partenaires.", TypeNotification.ACTUALITE, membres, 2);
 
@@ -220,6 +220,7 @@ public class DonneesTest implements CommandLineRunner {
     private Cohorte cohorte(String nom, String code, int numero, int debut, int fin, StatutCohorteEnum statut, String centre, String region) {
         return cohorteRepository.save(Cohorte.builder().nom(nom).code(code).numero(numero).anneeDebut(debut).anneeFin(fin)
                 .dateDebut(LocalDate.of(debut, 10, 1)).dateFin(LocalDate.of(fin, 9, 30)).statut(statut).centre(centre)
+                .typeCohorte(com.example.snjpro_backend.enumeration.TypeCohorteEnum.NON_FONCTIONNAIRE)
                 .region(region).recruesInitiales(800 + numero * 10).nombreCompagnies(4).nombreSections(16)
                 .description("Promotion " + numero + " du Service National des Jeunes").build());
     }

@@ -46,7 +46,7 @@ public class ImportAssistantController {
     }
 
     @PutMapping("/{id}/correspondance")
-    @Operation(summary = "Corriger la correspondance colonne du fichier -> champ SNJPro (champ vide = colonne ignorée)")
+    @Operation(summary = "Corriger la correspondance colonne du fichier -> champ Si-SNJ (champ vide = colonne ignorée)")
     public ResponseEntity<Analyse> correspondance(@PathVariable Long id, @RequestBody CorrespondanceRequest requete) {
         return ResponseEntity.ok(service.definirCorrespondance(id, requete.getCorrespondance()));
     }

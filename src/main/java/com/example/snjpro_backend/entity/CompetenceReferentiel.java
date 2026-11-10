@@ -6,7 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 /**
- * Compétence du référentiel SNJPro (F11). Les compétences des membres ({@link MembreCompetence})
+ * Compétence du référentiel Si-SNJ (F11). Les compétences des membres ({@link MembreCompetence})
  * y sont rattachées par leur intitulé.
  */
 @Entity

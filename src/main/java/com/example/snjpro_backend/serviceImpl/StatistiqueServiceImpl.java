@@ -160,7 +160,7 @@ public class StatistiqueServiceImpl implements StatistiqueServiceInterface {
         s.getCompletudeParAnnee().forEach((a, v) -> lignes.add(List.of("Complétude", String.valueOf(a), v + " %", "")));
         s.getCompetencesParAnnee().forEach((a, v) -> lignes.add(List.of("Compétences déclarées", String.valueOf(a), v + " %", "")));
         historiqueService.enregistrer("EXPORT", "STATISTIQUES", null, format.name());
-        return generateur.tableau(new GenerateurFichiers.Tableau("Statistiques SNJPro (" + s.getTotalMembres() + " membres)",
+        return generateur.tableau(new GenerateurFichiers.Tableau("Statistiques Si-SNJ (" + s.getTotalMembres() + " membres)",
                 List.of("Indicateur", "Valeur", "Effectif", "Part"), lignes), format);
     }
 

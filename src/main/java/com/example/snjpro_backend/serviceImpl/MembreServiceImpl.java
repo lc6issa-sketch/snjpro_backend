@@ -316,11 +316,34 @@ public class MembreServiceImpl implements MembreServiceInterface {
             m.setDernierDiplome(Diplomes.plusEleve(diplomes));
         } else if (dto.getDernierDiplome() != null) m.setDernierDiplome(dto.getDernierDiplome());
         if (dto.getCategorie() != null) m.setCategorie(dto.getCategorie());
+        // Catégorie non fournie : déduite du type de la cohorte (cohorte de fonctionnaires / non-fonctionnaires)
+        else if (m.getCategorie() == null && m.getCohorte() != null && m.getCohorte().getTypeCohorte() != null)
+            m.setCategorie(m.getCohorte().getTypeCohorte().name());
+        if (dto.getBrigade() != null) m.setBrigade(dto.getBrigade());
         if (dto.getCompagnie() != null) m.setCompagnie(dto.getCompagnie());
         if (dto.getSection() != null) m.setSection(dto.getSection());
-        if (dto.getBrigade() != null) m.setBrigade(dto.getBrigade());
         if (dto.getDateIncorporation() != null) m.setDateIncorporation(dto.getDateIncorporation());
         if (dto.getDisponibleMobilisation() != null) m.setDisponibleMobilisation(dto.getDisponibleMobilisation());
+        appliquerAptitude(m, dto);
+    }
+
+    /** Apte / inapte : un membre inapte doit avoir un type de handicap ; un membre apte n'en a pas. */
+    private void appliquerAptitude(Membre m, MembreDTO dto) {
+        if (dto.getAptitude() == null && dto.getTypeHandicap() == null) {
+            if (m.getAptitude() == null) m.setAptitude(com.example.snjpro_backend.enumeration.AptitudeEnum.APTE);
+            return;
+        }
+        com.example.snjpro_backend.enumeration.AptitudeEnum aptitude = dto.getAptitude() != null ? dto.getAptitude()
+                : (m.getAptitude() != null ? m.getAptitude() : com.example.snjpro_backend.enumeration.AptitudeEnum.APTE);
+        if (aptitude == com.example.snjpro_backend.enumeration.AptitudeEnum.INAPTE) {
+            String type = StringUtils.hasText(dto.getTypeHandicap()) ? dto.getTypeHandicap().trim() : m.getTypeHandicap();
+            if (!StringUtils.hasText(type))
+                throw new IllegalArgumentException("Précisez le type de handicap pour un membre inapte.");
+            m.setTypeHandicap(type);
+        } else {
+            m.setTypeHandicap(null);
+        }
+        m.setAptitude(aptitude);
     }
 
     private int tauxCompletude(Membre m, boolean aCompetences, boolean aParcours) {

@@ -130,13 +130,19 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
         m.setCritereAgeMax(c.getAgeMax());
         m.setCritereTelephoneVerifie(c.isTelephoneVerifieUniquement());
         m.setCritereExclureMobilises(c.isExclureDejaMobilises());
+        m.setCritereCompleterAutresCohortes(c.isCompleterAvecAutresCohortes());
+        m.setCritereCohortesComplement(joindre(c.getCohortesComplement() == null ? List.of()
+                : c.getCohortesComplement().stream().map(String::valueOf).toList()));
         return toDetail(mobilisationRepository.save(m));
     }
 
     @Override @Transactional(readOnly = true)
     public Apercu apercu(Long id, int limite) {
         Mobilisation m = trouverGerable(id);
-        List<Membre> membres = selectionner(m);
+        Selection sel = selectionDetaillee(m);
+        List<Membre> membres = new ArrayList<>(sel.principaux());
+        membres.addAll(sel.complement());
+        Set<Long> complement = sel.complement().stream().map(Membre::getId).collect(Collectors.toSet());
         List<String> competences = separer(m.getCritereCompetences());
         long femmes = membres.stream().filter(x -> x.getSexe() == SexeEnum.FEMININ).count();
         long verifies = membres.stream().filter(x -> Boolean.TRUE.equals(x.getTelephoneVerifie())).count();
@@ -149,8 +155,15 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
                 .pourcentageFemmes(pourcentage(femmes, membres.size()))
                 .pourcentageTelephoneVerifie(pourcentage(verifies, membres.size()))
                 .estimationSms((int) membres.stream().filter(x -> StringUtils.hasText(x.getNumeroTelephone())).count())
+                .objectif(m.getNombreVolontaires())
+                .totalCohortesChoisies(sel.principaux().size())
+                .manque(m.getNombreVolontaires() == null ? 0 : Math.max(0, m.getNombreVolontaires() - sel.principaux().size()))
+                .complementDisponible(sel.complementDisponible())
+                .complementRetenu(sel.complement().size())
                 .membres(membres.stream()
-                        .sorted(Comparator.comparingInt((Membre x) -> -SelectionMembres.competencesCorrespondantes(x, competences).size()))
+                        // membres des cohortes choisies d'abord, puis le complément
+                        .sorted(Comparator.comparing((Membre x) -> complement.contains(x.getId()))
+                                .thenComparingInt((Membre x) -> -SelectionMembres.competencesCorrespondantes(x, competences).size()))
                         .limit(Math.max(1, Math.min(limite, 500)))
                         .map(x -> MembreSelectionne.builder()
                                 .membreId(x.getId()).identifiantSnj(x.getIdentifiantSnj())
@@ -158,6 +171,7 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
                                 .cohorte(x.getCohorte().getNom())
                                 .competencesCorrespondantes(SelectionMembres.competencesCorrespondantes(x, competences))
                                 .telephoneVerifie(Boolean.TRUE.equals(x.getTelephoneVerifie()))
+                                .complement(complement.contains(x.getId()))
                                 .build())
                         .toList())
                 .build();
@@ -337,22 +351,56 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
         m.setDateRelance(LocalDateTime.now());
     }
 
+    /** Membres sélectionnés : ceux des cohortes choisies, puis le complément éventuel venant d'autres cohortes. */
     private List<Membre> selectionner(Mobilisation m) {
+        Selection s = selectionDetaillee(m);
+        List<Membre> tous = new ArrayList<>(s.principaux());
+        tous.addAll(s.complement());
+        return tous;
+    }
+
+    /**
+     * principaux : membres des cohortes choisies (ou de toutes si aucune cohorte n'est choisie) ;
+     * complement : membres d'autres cohortes ajoutés pour atteindre le nombre de volontaires, les plus pertinents d'abord
+     * (compétences correspondantes) ; complementDisponible : nombre total de candidats possibles dans les autres cohortes.
+     */
+    private record Selection(List<Membre> principaux, List<Membre> complement, int complementDisponible) { }
+
+    private Selection selectionDetaillee(Mobilisation m) {
         Set<Long> exclure = m.isCritereExclureMobilises()
                 ? participationRepository.membresMobilises(ReponseMobilisation.DISPONIBLE, List.of(StatutMobilisation.EN_COURS, StatutMobilisation.PLANIFIEE))
                 : Set.of();
         List<StatutMembreEnum> statuts = separer(m.getCritereStatuts()).stream().map(StatutMembreEnum::valueOf).toList();
-        return dansPerimetreDeLAuteur(m, selection.filtrer(SelectionMembres.Criteres.builder()
+        List<Long> cohortes = separer(m.getCritereCohortes()).stream().map(Long::valueOf).toList();
+        SelectionMembres.Criteres.CriteresBuilder criteres = SelectionMembres.Criteres.builder()
                 .regions(separer(m.getCritereRegions()))
                 .competences(separer(m.getCritereCompetences()))
                 .toutesCompetences(m.isCritereToutesCompetences())
-                .cohorteIds(separer(m.getCritereCohortes()).stream().map(Long::valueOf).toList())
                 .statuts(statuts.isEmpty() ? List.of(StatutMembreEnum.ACTIF) : statuts)
                 .sexe(m.getCritereSexe())
                 .ageMin(m.getCritereAgeMin()).ageMax(m.getCritereAgeMax())
                 .telephoneVerifieUniquement(m.isCritereTelephoneVerifie())
-                .exclure(exclure)
-                .build()));
+                .exclure(exclure);
+        List<Membre> principaux = dansPerimetreDeLAuteur(m, selection.filtrer(criteres.cohorteIds(cohortes).build()));
+
+        Integer objectif = m.getNombreVolontaires();
+        // Pas de complément sans cohorte choisie ni nombre de volontaires, ou si l'objectif est déjà atteint
+        if (cohortes.isEmpty() || objectif == null || principaux.size() >= objectif)
+            return new Selection(principaux, List.of(), 0);
+
+        // Candidats des autres cohortes (celles désignées, ou toutes les autres), mêmes critères, dans le périmètre de l'auteur
+        List<Long> designees = separer(m.getCritereCohortesComplement()).stream().map(Long::valueOf)
+                .filter(id -> !cohortes.contains(id)).toList();
+        Set<Long> dejaPris = principaux.stream().map(Membre::getId).collect(Collectors.toSet());
+        List<String> competences = separer(m.getCritereCompetences());
+        List<Membre> candidats = dansPerimetreDeLAuteur(m, selection.filtrer(criteres.cohorteIds(designees).build())).stream()
+                .filter(x -> !cohortes.contains(x.getCohorte().getId()) && !dejaPris.contains(x.getId()))
+                .sorted(Comparator.comparingInt((Membre x) -> -SelectionMembres.competencesCorrespondantes(x, competences).size()))
+                .toList();
+        // Les candidats sont comptés même si l'option est désactivée, pour la proposer dans l'assistant
+        List<Membre> retenus = Boolean.TRUE.equals(m.getCritereCompleterAutresCohortes())
+                ? candidats.stream().limit(objectif - principaux.size()).toList() : List.of();
+        return new Selection(principaux, retenus, candidats.size());
     }
 
     private void appliquer(Mobilisation m, Informations dto) {
@@ -467,6 +515,8 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
         c.setAgeMax(m.getCritereAgeMax());
         c.setTelephoneVerifieUniquement(m.isCritereTelephoneVerifie());
         c.setExclureDejaMobilises(m.isCritereExclureMobilises());
+        c.setCompleterAvecAutresCohortes(Boolean.TRUE.equals(m.getCritereCompleterAutresCohortes()));
+        c.setCohortesComplement(separer(m.getCritereCohortesComplement()).stream().map(Long::valueOf).toList());
         Envoi e = new Envoi();
         e.setMessage(m.getMessage() != null ? m.getMessage() : messageParDefaut(m));
         e.setCanalApplication(m.isCanalApplication());
@@ -517,7 +567,7 @@ public class MobilisationServiceImpl implements MobilisationServiceInterface {
         return "Bonjour {prenom}, le SNJ organise « " + m.getTitre() + " »"
                 + (m.getLieu() != null ? " à " + m.getLieu() : "")
                 + " à partir du " + m.getDateDebut().format(JOUR) + ". Votre profil correspond au besoin. "
-                + "Confirmez votre disponibilité dans l'application SNJPro"
+                + "Confirmez votre disponibilité dans l'application Si-SNJ"
                 + (m.getDateLimiteReponse() != null ? " avant le " + m.getDateLimiteReponse().format(JOUR) : "") + ".";
     }
 

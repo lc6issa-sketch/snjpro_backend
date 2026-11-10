@@ -13,7 +13,7 @@ public class SituationProfessionnelleDTO {
     private Long id;
     @Schema(accessMode = Schema.AccessMode.READ_ONLY, description = "Déduit de l'URL")
     private Long membreId;
-    @NotNull(message = "Le statut professionnel est obligatoire")
+    @Schema(description = "Facultatif (Si-SNJ : le formulaire ne saisit plus que la profession). Défaut : statut existant ou AUTRE")
     private StatutProfessionnelEnum statut;
     @Size(max = 100)
     private String profession;

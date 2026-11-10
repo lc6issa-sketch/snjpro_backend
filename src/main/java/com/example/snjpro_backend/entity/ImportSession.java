@@ -34,7 +34,7 @@ public class ImportSession {
     @Builder.Default
     private StatutImport statut = StatutImport.ANALYSE;
 
-    /** JSON : en-tête du fichier -> champ SNJPro (null = colonne ignorée). */
+    /** JSON : en-tête du fichier -> champ Si-SNJ (null = colonne ignorée). */
     @Column(columnDefinition = "TEXT")
     private String correspondance;
 

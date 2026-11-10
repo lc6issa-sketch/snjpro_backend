@@ -26,6 +26,10 @@ public class MigrationSchema implements CommandLineRunner {
         executer("ALTER TABLE utilisateurs MODIFY COLUMN role VARCHAR(40) NOT NULL");
         executer("ALTER TABLE cohortes MODIFY COLUMN statut VARCHAR(30) NOT NULL");
         executer("ALTER TABLE membres MODIFY COLUMN statut VARCHAR(20) NOT NULL");
+        // Si-SNJ : statuts de cohorte réduits à EN_FORMATION / INCORPOREE / EN_FONCTION (+ ARCHIVEE par l'action d'archivage)
+        executer("UPDATE cohortes SET statut = 'EN_FONCTION' WHERE statut IN ('EN_RESERVE', 'LIBEREE', 'ACTIVE', 'TERMINEE')");
+        // Si-SNJ : aptitude des membres (APTE par défaut pour les fiches existantes)
+        executer("UPDATE membres SET aptitude = 'APTE' WHERE aptitude IS NULL");
     }
 
     private void executer(String sql) {

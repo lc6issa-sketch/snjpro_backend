@@ -3,6 +3,7 @@ package com.example.snjpro_backend.entity;
 
 
 import com.example.snjpro_backend.enumeration.StatutCohorteEnum;
+import com.example.snjpro_backend.enumeration.TypeCohorteEnum;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -47,6 +48,19 @@ public class Cohorte {
     @Builder.Default
     private StatutCohorteEnum statut = StatutCohorteEnum.EN_FORMATION;
 
+    /** Cohorte de fonctionnaires ou de non-fonctionnaires (choisi à la création). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type_cohorte", columnDefinition = "VARCHAR(30)")
+    private TypeCohorteEnum typeCohorte;
+
+    /** Directeur du centre de formation. */
+    @Column(name = "directeur_centre", length = 150)
+    private String directeurCentre;
+
+    /** Major du centre de formation. */
+    @Column(name = "major_centre", length = 150)
+    private String majorCentre;
+
     /** Numéro d'ordre de la promotion (ex. 22 pour « Cohorte 2021 — N°22 »). */
     private Integer numero;
 
@@ -63,7 +77,10 @@ public class Cohorte {
     @Column(name = "nombre_sections")
     private Integer nombreSections;
 
-    /** Compte du responsable de cohorte (utilisateur ROLE_RESPONSABLE_COHORTE). */
+    /**
+     * Ancien « responsable de cohorte » (compte utilisateur), remplacé dans le formulaire par directeurCentre / majorCentre.
+     * Conservé pour les données existantes : le périmètre d'un responsable repose sur utilisateurs.cohorte_id, pas sur ce champ.
+     */
     @Column(name = "responsable_id")
     private Long responsableId;
 

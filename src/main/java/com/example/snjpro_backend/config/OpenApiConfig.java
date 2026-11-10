@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @OpenAPIDefinition(
         info = @Info(
-                title = "SNJPro API",
+                title = "Si-SNJ API",
                 version = "1.0.0",
                 description = """
                         API REST du Système d'Information du Service National des Jeunes du Mali.

@@ -36,6 +36,8 @@ public class SuiviModifications {
         LIBELLES.put("personneAPrevenir", "Personne à prévenir");
         LIBELLES.put("personneAPrevenirTelephone", "Téléphone de la personne à prévenir");
         LIBELLES.put("statut", "Statut");
+        LIBELLES.put("aptitude", "Aptitude");
+        LIBELLES.put("typeHandicap", "Type de handicap");
         LIBELLES.put("cohorte", "Cohorte");
         LIBELLES.put("nationalite", "Nationalité");
         LIBELLES.put("groupeSanguin", "Groupe sanguin");
@@ -67,6 +69,8 @@ public class SuiviModifications {
         v.put("personneAPrevenir", m.getPersonneAPrevenir());
         v.put("personneAPrevenirTelephone", m.getPersonneAPrevenirTelephone());
         v.put("statut", texte(m.getStatut()));
+        v.put("aptitude", texte(m.getAptitude()));
+        v.put("typeHandicap", m.getTypeHandicap());
         v.put("cohorte", m.getCohorte() != null ? m.getCohorte().getNom() : null);
         v.put("nationalite", m.getNationalite());
         v.put("groupeSanguin", m.getGroupeSanguin());

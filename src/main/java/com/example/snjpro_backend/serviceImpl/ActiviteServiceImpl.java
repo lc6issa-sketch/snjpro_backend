@@ -44,6 +44,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
     private final MobilisationRepository mobilisationRepository;
     private final ParticipationMobilisationRepository participationRepository;
     private final MembreRepository membreRepository;
+    private final CohorteRepository cohorteRepository;
     private final ParcoursSNJRepository parcoursRepository;
     private final GenerateurFichiers generateur;
     private final PerimetreService perimetre;
@@ -182,8 +183,8 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
         String region = m.getLocalisation() != null ? m.getLocalisation().getRegion() : null;
         return activiteRepository.findAllByOrderByDateDesc().stream()
                 .filter(a -> statut(a) == StatutActivite.EN_COURS)
-                .filter(a -> a.getCohorteId() == null || a.getCohorteId().equals(m.getCohorte().getId()))
-                .filter(a -> a.getRegion() == null || a.getRegion().equalsIgnoreCase(region)
+                .filter(a -> ouverteACohorte(a, m))
+                .filter(a -> a.getRegion() == null || a.getRegion().equalsIgnoreCase(region) || appeleEnComplement(a, m)
                         || (a.getMobilisation() != null && participationRepository
                         .findByMobilisationIdAndMembreId(a.getMobilisation().getId(), m.getId()).isPresent()))
                 .map(this::toResume)
@@ -202,7 +203,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
         ModePresence mode;
         if (StringUtils.hasText(dto.getQr())) {
             String qr = dto.getQr().trim();
-            if (!qr.startsWith(PREFIXE_QR)) throw new IllegalArgumentException("Ce QR code n'est pas un QR code de présence SNJPro.");
+            if (!qr.startsWith(PREFIXE_QR)) throw new IllegalArgumentException("Ce QR code n'est pas un QR code de présence Si-SNJ.");
             String[] parties = qr.substring(PREFIXE_QR.length()).split(":");
             if (parties.length != 2) throw new IllegalArgumentException("QR code illisible.");
             a = trouver(Long.valueOf(parties[0]));
@@ -224,7 +225,7 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
         } else {
             throw new IllegalArgumentException("Scannez le QR code ou saisissez le code de présence.");
         }
-        if (a.getCohorteId() != null && !a.getCohorteId().equals(m.getCohorte().getId()))
+        if (!ouverteACohorte(a, m))
             throw new ConflitException("Cette activité est réservée aux membres d'une autre cohorte.");
         if (horsLigne ? !enCoursLe(a, jour) : (!a.isQrActif() || statut(a) != StatutActivite.EN_COURS))
             throw new ConflitException(horsLigne
@@ -324,11 +325,52 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
         a.setHeureFin(dto.getHeureFin());
         a.setLieu(dto.getLieu());
         a.setRegion(u.getRole() == RoleEnum.ROLE_RESPONSABLE_REGIONAL ? u.getRegion() : dto.getRegion());
-        // Activité créée par un responsable de cohorte : réservée à sa cohorte
+        // Activité créée par un responsable de cohorte : réservée à sa cohorte ; sinon cohorte choisie (facultative)
         if (u.getRole() == RoleEnum.ROLE_RESPONSABLE_COHORTE) a.setCohorteId(u.getCohorteId());
+        else {
+            if (dto.getCohorteId() != null && !cohorteRepository.existsById(dto.getCohorteId()))
+                throw new EntityNotFoundException("Cohorte non trouvée : " + dto.getCohorteId());
+            a.setCohorteId(dto.getCohorteId());
+        }
+        a.setNombreParticipants(dto.getNombreParticipants());
+        appliquerComplement(a, dto, u);
         a.setQrActif(dto.isQrActif());
         a.setMobilisation(dto.getMobilisationId() == null ? null : mobilisationRepository.findById(dto.getMobilisationId())
                 .orElseThrow(() -> new EntityNotFoundException("Mobilisation non trouvée : " + dto.getMobilisationId())));
+    }
+
+    /**
+     * Cohortes de complément : seulement pour une activité réservée à une cohorte. Un responsable de cohorte ne peut pas
+     * ouvrir son activité à d'autres cohortes (hors de son périmètre) : il passe par un administrateur.
+     */
+    private void appliquerComplement(Activite a, Edition dto, User u) {
+        List<Long> ids = dto.getCohortesComplement() == null ? List.of() : dto.getCohortesComplement().stream()
+                .filter(java.util.Objects::nonNull).filter(id -> !id.equals(a.getCohorteId())).distinct().toList();
+        if (a.getCohorteId() == null || ids.isEmpty()) { a.setCohortesComplement(null); return; }
+        if (u.getRole() == RoleEnum.ROLE_RESPONSABLE_COHORTE)
+            throw new AccessDeniedException("Seul un administrateur peut compléter l'activité avec les membres d'autres cohortes.");
+        for (Long id : ids)
+            if (!cohorteRepository.existsById(id)) throw new EntityNotFoundException("Cohorte non trouvée : " + id);
+        a.setCohortesComplement(MobilisationServiceImpl.joindre(ids.stream().map(String::valueOf).toList()));
+    }
+
+    private static List<Long> cohortesComplement(Activite a) {
+        return MobilisationServiceImpl.separer(a.getCohortesComplement()).stream().map(Long::valueOf).toList();
+    }
+
+    /** Le membre est appelé en complément : sa cohorte fait partie des cohortes de complément. */
+    private static boolean appeleEnComplement(Activite a, Membre m) {
+        return a.getCohorteId() != null && cohortesComplement(a).contains(m.getCohorte().getId());
+    }
+
+    /**
+     * Activité ouverte au membre : pas de cohorte imposée, membre de la cohorte, membre d'une cohorte de complément,
+     * ou volontaire disponible de la mobilisation liée (qui peut elle-même avoir été complétée avec d'autres cohortes).
+     */
+    private boolean ouverteACohorte(Activite a, Membre m) {
+        if (a.getCohorteId() == null || a.getCohorteId().equals(m.getCohorte().getId()) || appeleEnComplement(a, m)) return true;
+        return a.getMobilisation() != null && participationRepository.findByMobilisationIdAndMembreId(a.getMobilisation().getId(), m.getId())
+                .map(p -> p.getReponse() == ReponseMobilisation.DISPONIBLE).orElse(false);
     }
 
     private Membre membreCourant() {
@@ -375,6 +417,13 @@ public class ActiviteServiceImpl implements ActiviteServiceInterface {
                 .statut(statut(a)).qrActif(a.isQrActif())
                 .mobilisationId(a.getMobilisation() != null ? a.getMobilisation().getId() : null)
                 .mobilisation(a.getMobilisation() != null ? a.getMobilisation().getTitre() : null)
+                .cohorteId(a.getCohorteId())
+                .cohorte(a.getCohorteId() == null ? null : cohorteRepository.findById(a.getCohorteId()).map(Cohorte::getNom).orElse(null))
+                .nombreParticipants(a.getNombreParticipants())
+                .effectifCohorte(a.getCohorteId() == null ? null
+                        : membreRepository.countByCohorteIdAndStatut(a.getCohorteId(), com.example.snjpro_backend.enumeration.StatutMembreEnum.ACTIF))
+                .cohortesComplement(cohortesComplement(a))
+                .cohortesComplementNoms(cohorteRepository.findAllById(cohortesComplement(a)).stream().map(Cohorte::getNom).toList())
                 .compteurs(Compteurs.builder()
                         .inscrits(inscrits).presents(presents)
                         .tauxPresence(inscrits == null || inscrits == 0 ? 0 : (int) Math.round(presents * 100.0 / inscrits))

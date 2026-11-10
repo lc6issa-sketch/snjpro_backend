@@ -46,6 +46,17 @@ public class Activite {
     @Column(name = "cohorte_id")
     private Long cohorteId;
 
+    /** Nombre de participants attendus (facultatif). */
+    @Column(name = "nombre_participants")
+    private Integer nombreParticipants;
+
+    /**
+     * Cohortes appelées en complément quand la cohorte de l'activité n'a pas assez de membres (ids séparés par des virgules) :
+     * leurs membres peuvent aussi pointer.
+     */
+    @Column(name = "cohortes_complement", columnDefinition = "TEXT")
+    private String cohortesComplement;
+
     /** Mobilisation liée : ses volontaires disponibles constituent la liste des inscrits. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mobilisation_id")

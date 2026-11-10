@@ -89,7 +89,7 @@ public class AuthAvanceServiceImpl implements AuthAvanceServiceInterface {
             String tel = telephoneDe(user);
             if (tel == null) return emettreJeton(user, requete);
             String code = codes.creerCode(TypeCodeVerification.CONNEXION, cleUser(user), user.getId(), null);
-            envoi.sms(tel, "SNJPro : votre code de connexion est " + code + ". Ne le communiquez à personne.");
+            envoi.sms(tel, "Si-SNJ : votre code de connexion est " + code + ". Ne le communiquez à personne.");
             return AuthResponse.builder().deuxiemeFacteurRequis(true).username(user.getUsername())
                     .telephoneMasque(masquer(tel)).message("Saisissez le code envoyé par SMS au " + masquer(tel) + ".").build();
         }
@@ -152,7 +152,7 @@ public class AuthAvanceServiceImpl implements AuthAvanceServiceInterface {
         if (user.isEmpty() || tel == null)
             return codes.reponseEnvoi(REPONSE_NEUTRE, null);
         String code = codes.creerCode(TypeCodeVerification.CONNEXION, cleUser(user.get()), user.get().getId(), null);
-        envoi.sms(tel, "SNJPro : votre code de connexion est " + code + ". Ne le communiquez à personne.");
+        envoi.sms(tel, "Si-SNJ : votre code de connexion est " + code + ". Ne le communiquez à personne.");
         Map<String, Object> r = codes.reponseEnvoi("Code envoyé par SMS au " + masquer(tel) + ".", code);
         r.put("telephoneMasque", masquer(tel));
         return r;
@@ -177,7 +177,7 @@ public class AuthAvanceServiceImpl implements AuthAvanceServiceInterface {
                 .filter(User::isActif)
                 .ifPresent(u -> {
                     String jeton = codes.creerJetonLien(TypeCodeVerification.REINITIALISATION, cleUser(u), u.getId(), 1);
-                    envoi.email(u.getEmail(), "SNJPro — Réinitialisation de votre mot de passe",
+                    envoi.email(u.getEmail(), "Si-SNJ — Réinitialisation de votre mot de passe",
                             "Pour choisir un nouveau mot de passe, ouvrez ce lien (valable 1 heure) : "
                                     + frontendUrl + "/reinitialiser-mot-de-passe?jeton=" + jeton);
                     historiqueService.enregistrer("DEMANDE_REINITIALISATION", ENTITE, u.getId(), "Par e-mail", u.getUsername());
@@ -191,7 +191,7 @@ public class AuthAvanceServiceImpl implements AuthAvanceServiceInterface {
         Optional<User> u = parTelephone(tel).filter(User::isActif);
         if (u.isEmpty()) return codes.reponseEnvoi(REPONSE_NEUTRE, null);
         String code = codes.creerCode(TypeCodeVerification.REINITIALISATION, "tel:" + tel, u.get().getId(), null);
-        envoi.sms(tel, "SNJPro : code de réinitialisation " + code + " (valable 10 minutes).");
+        envoi.sms(tel, "Si-SNJ : code de réinitialisation " + code + " (valable 10 minutes).");
         return codes.reponseEnvoi("Code envoyé par SMS au " + masquer(tel) + ".", code);
     }
 
@@ -232,7 +232,7 @@ public class AuthAvanceServiceImpl implements AuthAvanceServiceInterface {
         if (m.getUserId() != null && userRepository.existsById(m.getUserId()))
             throw new ConflitException("Ce compte est déjà activé : connectez-vous ou utilisez « Mot de passe oublié ».");
         String code = codes.creerCode(TypeCodeVerification.ACTIVATION, "tel:" + tel, null, m.getId());
-        envoi.sms(tel, "SNJPro : votre code d'activation est " + code + " (valable 10 minutes).");
+        envoi.sms(tel, "Si-SNJ : votre code d'activation est " + code + " (valable 10 minutes).");
         return codes.reponseEnvoi("Code envoyé par SMS au " + masquer(tel) + ".", code);
     }
 
@@ -352,7 +352,7 @@ public class AuthAvanceServiceImpl implements AuthAvanceServiceInterface {
         userRepository.save(u);
         codes.consommer(cv);
         notificationService.alerterRoles(List.of(RoleEnum.ROLE_ADMIN_SYSTEME), null, "Invitation acceptée",
-                nom(u) + " a rejoint SNJPro", "INVITATION", "UTILISATEUR", u.getId());
+                nom(u) + " a rejoint Si-SNJ", "INVITATION", "UTILISATEUR", u.getId());
         historiqueService.enregistrer("INVITATION_ACCEPTEE", ENTITE, u.getId(), null, u.getUsername());
         return emettreJeton(u, requete);
     }
@@ -481,7 +481,7 @@ public class AuthAvanceServiceImpl implements AuthAvanceServiceInterface {
         Membre m = membreRepository.findById(perimetre.membreIdCourant()).orElseThrow();
         if (!StringUtils.hasText(m.getNumeroTelephone())) throw new IllegalArgumentException("Renseignez d'abord votre numéro de téléphone.");
         String code = codes.creerCode(TypeCodeVerification.VERIFICATION_TELEPHONE, "tel:" + m.getNumeroTelephone(), null, m.getId());
-        envoi.sms(m.getNumeroTelephone(), "SNJPro : code de vérification " + code + " (valable 10 minutes).");
+        envoi.sms(m.getNumeroTelephone(), "Si-SNJ : code de vérification " + code + " (valable 10 minutes).");
         return codes.reponseEnvoi("Code envoyé par SMS au " + masquer(m.getNumeroTelephone()) + ".", code);
     }
 
@@ -502,7 +502,7 @@ public class AuthAvanceServiceImpl implements AuthAvanceServiceInterface {
 
     private void envoyerInvitation(User u, String message) {
         String jeton = codes.creerJetonLien(TypeCodeVerification.INVITATION, cleUser(u), u.getId(), 72);
-        envoi.email(u.getEmail(), "Invitation à rejoindre SNJPro",
+        envoi.email(u.getEmail(), "Invitation à rejoindre Si-SNJ",
                 (StringUtils.hasText(message) ? message + "\n\n" : "") + "Activez votre compte (lien valable 72 heures) : "
                         + frontendUrl + "/invitation?jeton=" + jeton);
     }
@@ -580,7 +580,7 @@ public class AuthAvanceServiceImpl implements AuthAvanceServiceInterface {
 
     static String appareil(String ua) {
         if (ua == null) return "Appareil inconnu";
-        if (ua.contains("SNJPro")) return "Application SNJPro · " + (ua.contains("iPhone") || ua.contains("iOS") ? "iOS" : "Android");
+        if (ua.contains("Si-SNJ")) return "Application Si-SNJ · " + (ua.contains("iPhone") || ua.contains("iOS") ? "iOS" : "Android");
         String nav = ua.contains("Edg/") ? "Edge" : ua.contains("Firefox") ? "Firefox" : ua.contains("Chrome") ? "Chrome"
                 : ua.contains("Safari") ? "Safari" : ua.contains("okhttp") || ua.contains("Dart") ? "Application mobile" : "Navigateur";
         String os = ua.contains("Windows") ? "Windows" : ua.contains("Android") ? "Android" : ua.contains("iPhone") ? "iOS"

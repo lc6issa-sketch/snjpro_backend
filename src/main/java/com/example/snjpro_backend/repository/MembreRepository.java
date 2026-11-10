@@ -40,4 +40,5 @@ public interface MembreRepository extends JpaRepository<Membre, Long>, JpaSpecif
     long countByStatut(StatutMembreEnum statut);
     long countBySexe(SexeEnum sexe);
     long countByCohorteId(Long cohorteId);
+    long countByCohorteIdAndStatut(Long cohorteId, StatutMembreEnum statut);
 }

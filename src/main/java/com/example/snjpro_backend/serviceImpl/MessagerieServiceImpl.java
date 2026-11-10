@@ -67,7 +67,7 @@ public class MessagerieServiceImpl implements MessagerieServiceInterface {
                 Membre m = membreRepository.findById(dto.getMembreId())
                         .orElseThrow(() -> new EntityNotFoundException("Membre non trouvé : " + dto.getMembreId()));
                 if (m.getUserId() == null)
-                    throw new IllegalArgumentException("Ce membre n'a pas encore activé son compte SNJPro : contactez-le par téléphone ou SMS.");
+                    throw new IllegalArgumentException("Ce membre n'a pas encore activé son compte Si-SNJ : contactez-le par téléphone ou SMS.");
                 autre = m.getUserId();
             }
             if (Objects.equals(autre, moi.getId())) throw new IllegalArgumentException("Vous ne pouvez pas vous écrire à vous-même.");

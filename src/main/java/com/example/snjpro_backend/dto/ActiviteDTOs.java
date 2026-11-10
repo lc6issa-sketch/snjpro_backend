@@ -5,6 +5,7 @@ import com.example.snjpro_backend.enumeration.Enumerations.StatutActivite;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,6 +38,12 @@ public final class ActiviteDTOs {
         private String region;
         private Long mobilisationId;
         private boolean qrActif = true;
+        @Schema(description = "Activité réservée à une cohorte (imposée pour un responsable de cohorte)")
+        private Long cohorteId;
+        @Positive(message = "Le nombre de participants doit être positif")
+        private Integer nombreParticipants;
+        @Schema(description = "Cohortes appelées en complément si la cohorte n'a pas assez de membres")
+        private List<Long> cohortesComplement = new java.util.ArrayList<>();
     }
 
     @Data
@@ -85,6 +92,14 @@ public final class ActiviteDTOs {
         private Long mobilisationId;
         private String mobilisation;
         private boolean qrActif;
+        private Long cohorteId;
+        private String cohorte;
+        private Integer nombreParticipants;
+        /** Membres actifs de la cohorte de l'activité. */
+        private Long effectifCohorte;
+        private List<Long> cohortesComplement;
+        /** Noms des cohortes de complément. */
+        private List<String> cohortesComplementNoms;
         private Compteurs compteurs;
     }
 

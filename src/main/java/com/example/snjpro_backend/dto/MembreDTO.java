@@ -61,6 +61,11 @@ public class MembreDTO {
     private java.time.LocalDate dateIncorporation;
     private Boolean disponibleMobilisation;
     private StatutMembreEnum statut;
+    @Schema(description = "APTE ou INAPTE (handicap). Par défaut : APTE")
+    private com.example.snjpro_backend.enumeration.AptitudeEnum aptitude;
+    @Size(max = 150)
+    @Schema(description = "Type de handicap — obligatoire si aptitude = INAPTE")
+    private String typeHandicap;
     @NotNull(message = "La cohorte est obligatoire")
     private Long cohorteId;
 }

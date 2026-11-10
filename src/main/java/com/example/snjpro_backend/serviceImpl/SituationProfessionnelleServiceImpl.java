@@ -36,6 +36,7 @@ public class SituationProfessionnelleServiceImpl implements SituationProfessionn
         SituationProfessionnelle sp = situationRepository.findByMembreId(membreId).orElse(null);
         if (sp == null) return creer(membreId, dto);
         java.util.List<java.util.Map<String, String>> champs = new java.util.ArrayList<>();
+        if (dto.getStatut() == null) dto.setStatut(sp.getStatut());
         changement(champs, "statutProfessionnel", "Situation professionnelle",
                 sp.getStatut() == null ? null : sp.getStatut().name(), dto.getStatut() == null ? null : dto.getStatut().name());
         changement(champs, "profession", "Profession", sp.getProfession(), dto.getProfession());
@@ -60,7 +61,7 @@ public class SituationProfessionnelleServiceImpl implements SituationProfessionn
         appliquer(sp, dto);
         sp = situationRepository.save(sp);
         membre.setSituationProfessionnelle(sp);
-        historiqueService.enregistrer("AJOUT_SITUATION", "MEMBRE", membreId, dto.getStatut() + " / " + dto.getProfession());
+        historiqueService.enregistrer("AJOUT_SITUATION", "MEMBRE", membreId, sp.getStatut() + " / " + dto.getProfession());
         return mapper.toSituationDTO(sp);
     }
 
@@ -77,7 +78,9 @@ public class SituationProfessionnelleServiceImpl implements SituationProfessionn
     }
 
     private void appliquer(SituationProfessionnelle sp, SituationProfessionnelleDTO dto) {
-        sp.setStatut(dto.getStatut());
+        // Statut facultatif : conserve l'existant, sinon AUTRE
+        sp.setStatut(dto.getStatut() != null ? dto.getStatut()
+                : (sp.getStatut() != null ? sp.getStatut() : com.example.snjpro_backend.enumeration.StatutProfessionnelEnum.AUTRE));
         sp.setProfession(dto.getProfession());
         sp.setSecteurActivite(dto.getSecteurActivite());
         sp.setNomEmployeur(dto.getNomEmployeur());

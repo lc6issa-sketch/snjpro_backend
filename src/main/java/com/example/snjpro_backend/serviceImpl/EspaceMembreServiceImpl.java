@@ -126,7 +126,7 @@ public class EspaceMembreServiceImpl implements EspaceMembreServiceInterface {
     public VerificationCarte verifierCarte(String qrContenu) {
         String contenu = qrContenu == null ? "" : qrContenu.trim();
         if (!contenu.startsWith(PREFIXE_QR))
-            return VerificationCarte.builder().valide(false).message("QR code non reconnu : ce n'est pas une carte SNJPro.").build();
+            return VerificationCarte.builder().valide(false).message("QR code non reconnu : ce n'est pas une carte Si-SNJ.").build();
         String[] parties = contenu.substring(PREFIXE_QR.length()).split(":");
         if (parties.length != 2 || !MessageDigest.isEqual(signature(parties[0]).getBytes(StandardCharsets.UTF_8),
                 parties[1].getBytes(StandardCharsets.UTF_8)))
@@ -216,7 +216,7 @@ public class EspaceMembreServiceImpl implements EspaceMembreServiceInterface {
             sections.add(new GenerateurFichiers.Section("Engagements", eng));
         }
         return generateur.document(m.getPrenom() + " " + m.getNom(), cv.getTitre(), sections,
-                "CV généré le " + LocalDate.now().format(JJ_MM_AAAA) + " depuis SNJPro.");
+                "CV généré le " + LocalDate.now().format(JJ_MM_AAAA) + " depuis Si-SNJ.");
     }
 
     @Override
@@ -225,7 +225,7 @@ public class EspaceMembreServiceImpl implements EspaceMembreServiceInterface {
         if (contenu.startsWith("SNJPRO:ACT:"))
             return ProfilScanne.builder().valide(false).message("Ce QR code est celui d'une activité : utilisez « Scanner une présence ».").build();
         if (!contenu.startsWith(PREFIXE_QR))
-            return ProfilScanne.builder().valide(false).message("QR code non reconnu : ce n'est pas une carte SNJPro.").build();
+            return ProfilScanne.builder().valide(false).message("QR code non reconnu : ce n'est pas une carte Si-SNJ.").build();
         String[] parties = contenu.substring(PREFIXE_QR.length()).split(":");
         if (parties.length != 2 || !signatureValide(parties[0], parties[1]))
             return ProfilScanne.builder().valide(false).message("Signature invalide : carte falsifiée ou altérée.").build();

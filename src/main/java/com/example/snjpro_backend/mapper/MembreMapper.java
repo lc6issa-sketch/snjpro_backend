@@ -40,8 +40,11 @@ public class MembreMapper {
         dto.setDisponibleMobilisation(!Boolean.FALSE.equals(m.getDisponibleMobilisation()));
         dto.setTauxCompletude(com.example.snjpro_backend.serviceImpl.CompletudeProfil.taux(m));
         dto.setStatut(m.getStatut());
+        dto.setAptitude(m.getAptitude() != null ? m.getAptitude() : com.example.snjpro_backend.enumeration.AptitudeEnum.APTE);
+        dto.setTypeHandicap(m.getTypeHandicap());
         dto.setCohorteId(m.getCohorte().getId());
         dto.setCohorteNom(m.getCohorte().getNom());
+        dto.setCohorteType(m.getCohorte().getTypeCohorte());
         dto.setUserId(m.getUserId());
         dto.setDateCreation(m.getDateCreation());
         dto.setDateModification(m.getDateModification());

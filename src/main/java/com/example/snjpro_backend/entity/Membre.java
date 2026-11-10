@@ -1,5 +1,6 @@
 package com.example.snjpro_backend.entity;
 
+import com.example.snjpro_backend.enumeration.AptitudeEnum;
 import com.example.snjpro_backend.enumeration.SexeEnum;
 import com.example.snjpro_backend.enumeration.StatutMembreEnum;
 import jakarta.persistence.*;
@@ -110,6 +111,16 @@ public class Membre {
     @Column(nullable = false, columnDefinition = "VARCHAR(20)")
     @Builder.Default
     private StatutMembreEnum statut = StatutMembreEnum.ACTIF;
+
+    /** Aptitude physique (Si-SNJ) : remplace le choix Actif / Inactif dans les formulaires. */
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "VARCHAR(10)")
+    @Builder.Default
+    private AptitudeEnum aptitude = AptitudeEnum.APTE;
+
+    /** Type de handicap, obligatoire lorsque le membre est INAPTE. */
+    @Column(name = "type_handicap", length = 150)
+    private String typeHandicap;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cohorte_id", nullable = false)

@@ -35,6 +35,10 @@ public class MembreResponseDTO {
     private LocalDate dateIncorporation;
     private Boolean disponibleMobilisation;
     private StatutMembreEnum statut;
+    private com.example.snjpro_backend.enumeration.AptitudeEnum aptitude;
+    private String typeHandicap;
+    /** Nature de la cohorte du membre : FONCTIONNAIRE / NON_FONCTIONNAIRE. */
+    private com.example.snjpro_backend.enumeration.TypeCohorteEnum cohorteType;
     private Long cohorteId;
     private String cohorteNom;
     private Long userId;
